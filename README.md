@@ -115,14 +115,15 @@ cd security_content && git sparse-checkout set detections stories && cd ..
 git clone --depth 1 --filter=blob:none --sparse https://github.com/elastic/detection-rules.git
 cd detection-rules && git sparse-checkout set rules && cd ..
 
-# Download KQL hunting queries (~300+ queries)
-git clone --depth 1 https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules.git kql
+# Download KQL hunting queries (~400+ queries from 2 repos)
+git clone --depth 1 https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules.git kql-bertjanp
+git clone --depth 1 https://github.com/jkerai1/KQL-Queries.git kql-jkerai1
 
 echo "Done! Configure your MCP with these paths:"
 echo "  SIGMA_PATHS: $(pwd)/sigma/rules,$(pwd)/sigma/rules-threat-hunting"
 echo "  SPLUNK_PATHS: $(pwd)/security_content/detections"
 echo "  ELASTIC_PATHS: $(pwd)/detection-rules/rules"
-echo "  KQL_PATHS: $(pwd)/kql"
+echo "  KQL_PATHS: $(pwd)/kql-bertjanp,$(pwd)/kql-jkerai1"
 echo "  STORY_PATHS: $(pwd)/security_content/stories"
 ```
 
@@ -143,9 +144,10 @@ git clone https://github.com/splunk/security_content.git
 git clone https://github.com/elastic/detection-rules.git
 # Use rules/ directory
 
-# KQL Hunting Queries
+# KQL Hunting Queries (multiple sources supported)
 git clone https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules.git
-# Use entire repo
+git clone https://github.com/jkerai1/KQL-Queries.git
+# Use entire repos, combine paths with comma
 ```
 
 ## MCP Tools
@@ -377,15 +379,20 @@ From [Elastic Detection Rules](https://github.com/elastic/detection-rules):
 - Optional: `rule.description`, `rule.query`, `rule.severity`, `rule.tags`, `rule.threat` (MITRE mappings)
 - Supports EQL, KQL, Lucene, and ESQL query languages
 
-### KQL Hunting Queries (Markdown)
+### KQL Hunting Queries (Markdown & Raw .kql)
 
-From [Bert-JanP/Hunting-Queries-Detection-Rules](https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules):
-- Microsoft Defender XDR and Azure Sentinel hunting queries
-- Extracts title from markdown heading
-- Extracts KQL from fenced code blocks
+Supports multiple KQL repositories:
+
+**[Bert-JanP/Hunting-Queries-Detection-Rules](https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules)** (~290 queries)
+- Microsoft Defender XDR and Azure Sentinel hunting queries in Markdown format
+- Extracts title from markdown heading, KQL from fenced code blocks
 - Extracts MITRE technique IDs from tables
-- Derives category from folder path
-- Extracts data sources (DeviceProcessEvents, SigninLogs, etc.)
+- Categories: Defender For Endpoint, Azure AD, Threat Hunting, DFIR, etc.
+
+**[jkerai1/KQL-Queries](https://github.com/jkerai1/KQL-Queries)** (~130 queries)
+- Raw `.kql` files for Defender, Entra, Azure, Office 365
+- Title derived from filename
+- Lightweight queries for kqlsearch.com
 
 ## Development
 
@@ -414,9 +421,9 @@ When fully indexed with all sources:
 | Sigma Rules | ~3,000+ |
 | Splunk ESCU | ~2,000+ |
 | Elastic Rules | ~1,500+ |
-| KQL Queries | ~300+ |
+| KQL Queries | ~420+ |
 | Analytic Stories | ~330 |
-| **Total** | **~7,000+** |
+| **Total** | **~7,200+** |
 
 ## 🔗 Using with MITRE ATT&CK MCP
 
@@ -424,7 +431,7 @@ When fully indexed with all sources:
 
 | MCP | Purpose |
 |-----|---------|
-| **security-detections-mcp** | Query 7,000+ detection rules (Sigma, Splunk ESCU, Elastic, KQL) |
+| **security-detections-mcp** | Query 7,200+ detection rules (Sigma, Splunk ESCU, Elastic, KQL) |
 | **mitre-attack-mcp** | Analyze coverage against ATT&CK framework, generate Navigator layers |
 
 ### Combined Workflow (Efficient)

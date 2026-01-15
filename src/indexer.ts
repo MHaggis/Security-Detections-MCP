@@ -4,7 +4,7 @@ import { parseSigmaFile } from './parsers/sigma.js';
 import { parseSplunkFile } from './parsers/splunk.js';
 import { parseStoryFile } from './parsers/story.js';
 import { parseElasticFile } from './parsers/elastic.js';
-import { parseKqlFile } from './parsers/kql.js';
+import { parseKqlFile, parseRawKqlFile } from './parsers/kql.js';
 import { recreateDb, insertDetection, insertStory, getDetectionCount, initDb } from './db.js';
 
 // Recursively find all YAML files in a directory
@@ -74,9 +74,14 @@ function findTomlFiles(dir: string): string[] {
   return files;
 }
 
-// Recursively find all markdown files in a directory (for KQL queries)
-function findMarkdownFiles(dir: string): string[] {
-  const files: string[] = [];
+// Recursively find KQL files (.md with KQL blocks or raw .kql files)
+interface KqlFiles {
+  markdown: string[];
+  raw: string[];
+}
+
+function findKqlFiles(dir: string): KqlFiles {
+  const files: KqlFiles = { markdown: [], raw: [] };
   
   try {
     const entries = readdirSync(dir);
@@ -90,16 +95,22 @@ function findMarkdownFiles(dir: string): string[] {
         if (stat.isDirectory()) {
           // Skip common non-query directories
           if (!['Images', 'images', '.git', 'node_modules'].includes(entry)) {
-            files.push(...findMarkdownFiles(fullPath));
+            const subFiles = findKqlFiles(fullPath);
+            files.markdown.push(...subFiles.markdown);
+            files.raw.push(...subFiles.raw);
           }
         } else if (stat.isFile()) {
           const ext = extname(entry).toLowerCase();
+          const lowerName = entry.toLowerCase();
+          
           if (ext === '.md') {
             // Skip README files and common non-query files
-            const lowerName = entry.toLowerCase();
             if (lowerName !== 'readme.md' && lowerName !== 'license' && lowerName !== 'contributing.md') {
-              files.push(fullPath);
+              files.markdown.push(fullPath);
             }
+          } else if (ext === '.kql') {
+            // Raw KQL files (jkerai1/KQL-Queries format)
+            files.raw.push(fullPath);
           }
         }
       } catch {
@@ -194,12 +205,24 @@ export function indexDetections(
     }
   }
   
-  // Index KQL hunting queries (markdown format)
+  // Index KQL hunting queries (markdown and raw .kql formats)
   for (const basePath of kqlPaths) {
-    const files = findMarkdownFiles(basePath);
+    const files = findKqlFiles(basePath);
     
-    for (const file of files) {
+    // Parse markdown files (Bert-JanP format)
+    for (const file of files.markdown) {
       const detection = parseKqlFile(file, basePath);
+      if (detection) {
+        insertDetection(detection);
+        kql_indexed++;
+      } else {
+        kql_failed++;
+      }
+    }
+    
+    // Parse raw .kql files (jkerai1 format)
+    for (const file of files.raw) {
+      const detection = parseRawKqlFile(file, basePath);
       if (detection) {
         insertDetection(detection);
         kql_indexed++;

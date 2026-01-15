@@ -314,9 +314,94 @@ function extractPlatforms(content: string, dataSources: string[]): string[] {
   return Array.from(platforms);
 }
 
+// Parse a raw .kql file (just query content, filename is title)
+export function parseRawKqlFile(filePath: string, basePath: string): Detection | null {
+  try {
+    const stat = statSync(filePath);
+    if (!stat.isFile()) {
+      return null;
+    }
+    
+    const content = readFileSync(filePath, 'utf-8');
+    const query = content.trim();
+    
+    if (!query || query.length < 10) {
+      return null;
+    }
+    
+    // Title from filename (remove .kql extension)
+    const fileName = basename(filePath, '.kql');
+    const title = fileName;
+    
+    const id = generateId(filePath, title);
+    const category = extractCategory(filePath, basePath);
+    const dataSources = extractDataSources(query);
+    const processNames = extractProcessNames(query);
+    const keywords = extractKeywords(query, query);
+    const tags = extractTags(query, category);
+    const platforms = extractPlatforms(query, dataSources);
+    
+    // Extract CVEs from query comments or content
+    const cves: string[] = [];
+    const cveMatches = query.matchAll(/CVE-\d{4}-\d+/gi);
+    for (const match of cveMatches) {
+      cves.push(match[0].toUpperCase());
+    }
+    
+    // Extract description from first comment line if present
+    let description = '';
+    const commentMatch = query.match(/\/\/\s*(.+)/);
+    if (commentMatch) {
+      description = commentMatch[1].trim();
+    }
+    
+    const detection: Detection = {
+      id,
+      name: title,
+      description,
+      query,
+      source_type: 'kql',
+      mitre_ids: [],
+      logsource_category: null,
+      logsource_product: 'microsoft',
+      logsource_service: 'kql',
+      severity: null,
+      status: null,
+      author: null,
+      date_created: null,
+      date_modified: null,
+      references: [],
+      falsepositives: [],
+      tags,
+      file_path: filePath,
+      raw_yaml: content,
+      
+      cves,
+      analytic_stories: [],
+      data_sources: dataSources,
+      detection_type: 'Hunting',
+      asset_type: dataSources.some(ds => ds.startsWith('Device')) ? 'Endpoint' : 'Cloud',
+      security_domain: dataSources.some(ds => ds.startsWith('Device')) ? 'endpoint' : 
+                       dataSources.some(ds => ds.includes('Email')) ? 'email' : 'identity',
+      process_names: processNames,
+      file_paths: [],
+      registry_paths: [],
+      mitre_tactics: [],
+      platforms,
+      kql_category: category,
+      kql_tags: tags,
+      kql_keywords: keywords,
+    };
+    
+    return detection;
+  } catch {
+    return null;
+  }
+}
+
+// Parse markdown file with KQL code blocks (Bert-JanP format)
 export function parseKqlFile(filePath: string, basePath: string): Detection | null {
   try {
-    // Check if file exists and is a markdown file
     const stat = statSync(filePath);
     if (!stat.isFile()) {
       return null;
