@@ -82,6 +82,27 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   }
 }
 ```
+### Visual Studio Code
+
+Add to `~/.vscode/mcp.json`:
+
+```json
+{
+  "servers":  {
+    "security-detections": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "security-detections-mcp"],
+      "env": {
+        "SIGMA_PATHS":  "/Users/you/sigma/rules,/Users/you/sigma/rules-threat-hunting",
+        "SPLUNK_PATHS": "/Users/you/security_content/detections",
+        "ELASTIC_PATHS": "/Users/you/detection-rules/rules",
+        "KQL_PATHS": "/Users/you/kql-bertjanp,/Users/you/kql-jkerai1",
+        "STORY_PATHS": "/Users/you/security_content/stories"
+      }
+    }
+  }
+```
 
 ### Environment Variables
 
