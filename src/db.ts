@@ -745,7 +745,143 @@ export function getStoryCount(): number {
   }
 }
 
+// =============================================================================
+// COMPLETION HELPER FUNCTIONS - For autocomplete suggestions
+// =============================================================================
+
+export function getDistinctTechniqueIds(prefix: string, limit: number = 10): string[] {
+  const database = initDb();
+  
+  // Get all technique IDs and filter by prefix
+  const rows = database.prepare(`
+    SELECT DISTINCT mitre_ids FROM detections 
+    WHERE mitre_ids != '[]' AND mitre_ids IS NOT NULL
+  `).all() as { mitre_ids: string }[];
+  
+  const techniqueSet = new Set<string>();
+  for (const row of rows) {
+    const ids = JSON.parse(row.mitre_ids) as string[];
+    for (const id of ids) {
+      if (id.toUpperCase().startsWith(prefix.toUpperCase())) {
+        techniqueSet.add(id);
+      }
+    }
+  }
+  
+  return Array.from(techniqueSet).sort().slice(0, limit);
+}
+
+export function getDistinctCves(prefix: string, limit: number = 10): string[] {
+  const database = initDb();
+  
+  // Get all CVEs and filter by prefix
+  const rows = database.prepare(`
+    SELECT DISTINCT cves FROM detections 
+    WHERE cves != '[]' AND cves IS NOT NULL
+  `).all() as { cves: string }[];
+  
+  const cveSet = new Set<string>();
+  for (const row of rows) {
+    const cvelist = JSON.parse(row.cves) as string[];
+    for (const cve of cvelist) {
+      if (cve.toUpperCase().startsWith(prefix.toUpperCase())) {
+        cveSet.add(cve);
+      }
+    }
+  }
+  
+  return Array.from(cveSet).sort().slice(0, limit);
+}
+
+export function getDistinctProcessNames(prefix: string, limit: number = 10): string[] {
+  const database = initDb();
+  
+  // Get all process names and filter by prefix
+  const rows = database.prepare(`
+    SELECT DISTINCT process_names FROM detections 
+    WHERE process_names != '[]' AND process_names IS NOT NULL
+  `).all() as { process_names: string }[];
+  
+  const processSet = new Set<string>();
+  for (const row of rows) {
+    const procs = JSON.parse(row.process_names) as string[];
+    for (const proc of procs) {
+      if (proc.toLowerCase().startsWith(prefix.toLowerCase())) {
+        processSet.add(proc);
+      }
+    }
+  }
+  
+  return Array.from(processSet).sort().slice(0, limit);
+}
+
+// =============================================================================
+// INPUT VALIDATION - With did-you-mean suggestions
+// =============================================================================
+
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+  similar?: string[];
+}
+
+export function validateTechniqueId(id: string): ValidationResult {
+  // Check format: T followed by 4 digits, optionally .3 more digits
+  if (!id.match(/^T\d{4}(\.\d{3})?$/)) {
+    return { 
+      valid: false, 
+      error: 'Invalid technique ID format', 
+      suggestion: 'Use format T####.### (e.g., T1059.001)' 
+    };
+  }
+  
+  const database = initDb();
+  
+  // Check if this exact technique has detections
+  const exact = database.prepare(`
+    SELECT 1 FROM detections WHERE mitre_ids LIKE ? LIMIT 1
+  `).get(`%"${id}"%`);
+  
+  if (exact) {
+    return { valid: true };
+  }
+  
+  // Find similar techniques that we DO have
+  const similar = getDistinctTechniqueIds(id.substring(0, 5), 5);
+  
+  // Also check if we have parent or sub-techniques
+  const baseId = id.split('.')[0];
+  const parentMatch = database.prepare(`
+    SELECT 1 FROM detections WHERE mitre_ids LIKE ? LIMIT 1
+  `).get(`%"${baseId}"%`);
+  
+  if (parentMatch) {
+    return {
+      valid: true,
+      suggestion: `No exact match for ${id}, but found coverage for ${baseId}`,
+      similar: similar.length > 0 ? similar : undefined,
+    };
+  }
+  
+  if (similar.length > 0) {
+    return {
+      valid: false,
+      error: `No detections found for ${id}`,
+      suggestion: 'Try one of the similar techniques',
+      similar,
+    };
+  }
+  
+  return {
+    valid: true,
+    suggestion: `No existing detections for ${id} - this is a gap`,
+  };
+}
+
+// =============================================================================
 // Lightweight technique ID extraction - returns ONLY unique technique IDs
+// =============================================================================
 export interface TechniqueIdFilters {
   source_type?: 'sigma' | 'splunk_escu' | 'elastic';
   tactic?: string;

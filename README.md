@@ -4,8 +4,73 @@ An MCP (Model Context Protocol) server that lets LLMs query a unified database o
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInNlY3VyaXR5LWRldGVjdGlvbnMtbWNwIl0sImVudiI6eyJTSUdNQV9QQVRIUyI6Ii9wYXRoL3RvL3NpZ21hL3J1bGVzLC9wYXRoL3RvL3NpZ21hL3J1bGVzLXRocmVhdC1odW50aW5nIiwiU1BMVU5LX1BBVEhTIjoiL3BhdGgvdG8vc2VjdXJpdHlfY29udGVudC9kZXRlY3Rpb25zIiwiU1RPUllfUEFUSFMiOiIvcGF0aC90by9zZWN1cml0eV9jb250ZW50L3N0b3JpZXMiLCJFTEFTVElDX1BBVEhTIjoiL3BhdGgvdG8vZGV0ZWN0aW9uLXJ1bGVzL3J1bGVzIiwiS1FMX1BBVEhTIjoiL3BhdGgvdG8va3FsLXJ1bGVzIn19)
 
+## 🆕 MCP Prompts - Expert Detection Workflows
+
+This server includes **11 pre-built MCP Prompts** that provide structured, expert-level workflows for common security detection tasks. Instead of figuring out which tools to use and in what order, just ask for a prompt by name and get a comprehensive, professional analysis.
+
+### How to Use Prompts in Cursor
+
+Simply ask Claude to use a prompt by name:
+
+```
+You: "Use the ransomware-readiness-assessment prompt"
+You: "Run apt-threat-emulation for APT29"  
+You: "Execute the executive-security-briefing prompt for our CISO"
+You: "Use detection-engineering-sprint with capacity 5 and focus on ransomware"
+```
+
+### Available Prompts
+
+| Prompt | Description | Arguments |
+|--------|-------------|-----------|
+| `ransomware-readiness-assessment` | Comprehensive kill-chain analysis with risk scoring and remediation roadmap | `priority_focus`: prevention/detection/response/all |
+| `apt-threat-emulation` | Assess coverage against specific threat actors (APT29, Lazarus, Volt Typhoon, etc.) | `threat_actor` (required), `include_test_plan` |
+| `purple-team-exercise` | Generate complete test plans with procedures and expected detections | `scope` (tactic or technique), `environment` |
+| `soc-investigation-assist` | Investigation helper with triage guidance, hunting queries, and escalation criteria | `indicator` (required), `context` |
+| `detection-engineering-sprint` | Prioritized detection backlog with user stories and acceptance criteria | `sprint_capacity`, `threat_focus` |
+| `executive-security-briefing` | C-level report with business risk language and investment recommendations | `audience`: board/ciso/cto, `include_benchmarks` |
+| `cve-response-assessment` | Rapid assessment for emerging CVEs and threats | `cve_or_threat` (required) |
+| `data-source-gap-analysis` | Analyze telemetry requirements for improved detection coverage | `target_coverage` |
+| `detection-quality-review` | Deep-dive quality analysis of detections for a specific technique | `technique_id` (required) |
+| `threat-landscape-sync` | Align detection priorities with current threat landscape | `industry` |
+| `detection-coverage-diff` | Compare coverage against threat actors or baseline | `compare_against` (required) |
+
+### Example: Ransomware Assessment
+
+```
+You: "Use the ransomware-readiness-assessment prompt"
+
+Claude will automatically:
+1. Get baseline stats with get_stats
+2. Analyze ransomware-specific gaps with identify_gaps
+3. Review coverage by tactic with analyze_coverage  
+4. Map gaps to the ransomware kill chain
+5. Generate prioritized remediation roadmap
+6. Output a professional report with risk scores
+```
+
+### Example: APT Threat Assessment
+
+```
+You: "Run apt-threat-emulation for Volt Typhoon"
+
+Claude will:
+1. Research Volt Typhoon using MITRE ATT&CK data
+2. Get all 81 techniques attributed to the group
+3. Check your detection coverage for each technique
+4. Calculate coverage percentage and identify blind spots
+5. Generate a purple team test plan (optional)
+6. Provide prioritized detection recommendations
+```
+
 ## Features
 
+- **🆕 MCP Prompts** - 11 pre-built expert workflows for ransomware assessment, APT emulation, purple team exercises, executive briefings, and more
+- **🆕 MCP Resources** - Readable context for LLMs (stats, coverage summary, gaps) without tool calls
+- **🆕 Argument Completions** - Autocomplete for technique IDs, CVEs, process names as you type
+- **🆕 Server Instructions** - Built-in usage guide with examples for better LLM understanding
+- **🆕 Structured Errors** - Helpful error messages with suggestions and similar items
+- **🆕 Interactive Tools** - Gap prioritization and sprint planning with form-based input (Cursor 0.42+)
 - **Unified Search** - Query Sigma, Splunk ESCU, Elastic, and KQL detections from a single interface
 - **Full-Text Search** - SQLite FTS5 powered search across names, descriptions, queries, MITRE tactics, CVEs, process names, and more
 - **MITRE ATT&CK Mapping** - Filter detections by technique ID or tactic
@@ -150,6 +215,83 @@ git clone https://github.com/jkerai1/KQL-Queries.git
 # Use entire repos, combine paths with comma
 ```
 
+## 🆕 MCP Resources - Readable Context
+
+MCP Resources let LLMs read context directly without tool calls. Perfect for understanding the current state before making decisions.
+
+### Available Resources
+
+| Resource URI | Description |
+|-------------|-------------|
+| `detection://stats` | Current inventory statistics |
+| `detection://coverage-summary` | Tactic-by-tactic coverage percentages |
+| `detection://gaps/ransomware` | Current ransomware detection gaps |
+| `detection://gaps/apt` | Current APT detection gaps |
+| `detection://top-techniques` | Top 20 techniques with most coverage |
+
+Resources are automatically available in Cursor's context when needed.
+
+## 🆕 Argument Completions
+
+The server provides **autocomplete suggestions** as you type argument values:
+
+| Argument | Completions From |
+|----------|-----------------|
+| `technique_id` | Your indexed MITRE technique IDs (T1059.001, etc.) |
+| `cve_id` | Your indexed CVE IDs (CVE-2024-27198, etc.) |
+| `process_name` | Process names in your detections (powershell.exe, etc.) |
+| `tactic` | All 14 MITRE tactics |
+| `severity` | informational, low, medium, high, critical |
+| `source_type` | sigma, splunk_escu, elastic, kql |
+| `threat_profile` | ransomware, apt, initial-access, persistence, etc. |
+
+This prevents typos and helps discover what values are available in your detection corpus.
+
+## 🆕 Structured Errors & Suggestions
+
+When errors occur or no results are found, the server returns **helpful JSON responses** instead of plain strings:
+
+```json
+// Missing required argument
+{
+  "error": true,
+  "code": "MISSING_REQUIRED_ARG",
+  "message": "technique_id is required",
+  "examples": ["T1059.001", "T1547.001", "T1003.001"],
+  "hint": "Use format T####.### (e.g., T1059.001 for PowerShell)"
+}
+
+// No results found
+{
+  "results": [],
+  "technique_id": "T1234.999",
+  "suggestions": {
+    "message": "No detections found for this technique",
+    "similar_techniques": ["T1234.001", "T1234.002"],
+    "try_search": "search(\"T1234\") for broader results",
+    "tip": "Parent techniques (T1234) may catch sub-techniques"
+  }
+}
+```
+
+This helps LLMs self-correct and suggest alternatives without getting stuck.
+
+## 🆕 Interactive Tools (Cursor 0.42+)
+
+These tools use **MCP Elicitation** to present forms for interactive configuration:
+
+| Tool | Description |
+|------|-------------|
+| `prioritize_gaps` | Analyze gaps and get prioritized recommendations |
+| `plan_detection_sprint` | Interactive sprint configuration with capacity/focus/data source options |
+
+Example:
+```
+You: "Help me prioritize which ransomware gaps to fix first"
+Tool: prioritize_gaps(threat_profile="ransomware")
+→ Returns P0/P1/P2 prioritized gaps with selection guidance
+```
+
 ## MCP Tools
 
 ### Core Detection Tools
@@ -215,9 +357,161 @@ These tools do heavy processing server-side and return minimal, actionable data:
 | `identify_gaps(threat_profile, source_type?)` | Find gaps for ransomware, apt, persistence, etc. | ~500B |
 | `suggest_detections(technique_id, source_type?)` | Get detection ideas for a technique | ~2KB |
 | `get_technique_ids(source_type?, tactic?, severity?)` | Get only technique IDs (no full objects) | ~200B |
-| `generate_navigator_layer(name, source_type?, tactic?)` | Generate ATT&CK Navigator layer JSON | ~3KB |
+| `get_coverage_summary(source_type?)` | Just tactic percentages (~200 bytes) | ~200B |
+| `get_top_gaps(threat_profile)` | Just top 5 gap technique IDs (~300 bytes) | ~300B |
+| `get_technique_count(technique_id)` | Just the count for one technique (~50 bytes) | ~50B |
 
 **Why use these?** Traditional tools return full detection objects (~50KB+ per query). These return only what you need, saving 25x+ tokens.
+
+### Interactive Tools
+
+| Tool | Description |
+|------|-------------|
+| `prioritize_gaps(threat_profile, source_type?)` | Analyze gaps with P0/P1/P2 prioritization and selection guidance |
+| `plan_detection_sprint()` | Generate sprint configuration options with recommended backlog |
+
+## MCP Prompts - Detailed Reference
+
+MCP Prompts are pre-built, expert-level workflows that guide Claude through complex analysis tasks. They ensure consistent, comprehensive results by defining exactly which tools to use and in what order.
+
+### Why Use Prompts Instead of Ad-Hoc Questions?
+
+| Ad-Hoc Question | With MCP Prompt |
+|-----------------|-----------------|
+| "Check my ransomware coverage" | "Use ransomware-readiness-assessment" |
+| Claude might check 2-3 things | Claude executes 15+ step workflow |
+| Inconsistent output format | Professional report with risk scores |
+| May miss important aspects | Comprehensive kill-chain analysis |
+| Varies each time | Repeatable, auditable results |
+
+### Prompt Categories
+
+#### 🎯 Threat Assessment Prompts
+
+**`ransomware-readiness-assessment`**
+- Full ransomware kill-chain analysis
+- Risk scoring per attack phase
+- Prioritized remediation roadmap
+- Executive-ready reporting
+
+```
+Use ransomware-readiness-assessment with priority_focus "detection"
+```
+
+**`apt-threat-emulation`**
+- Coverage analysis against specific threat actors
+- Technique-by-technique gap identification  
+- Optional purple team test plan generation
+- Supports all MITRE ATT&CK groups (APT29, Lazarus, Volt Typhoon, Scattered Spider, etc.)
+
+```
+Run apt-threat-emulation for "Scattered Spider" with include_test_plan true
+```
+
+**`threat-landscape-sync`**
+- Align detections with current threats
+- Industry-specific threat prioritization
+- Top actor coverage analysis
+- Strategic roadmap generation
+
+```
+Use threat-landscape-sync for the finance industry
+```
+
+#### 🔬 Purple Team & Validation Prompts
+
+**`purple-team-exercise`**
+- Complete exercise planning for a tactic or technique
+- Test case development with procedures
+- Expected detection mapping
+- Safety controls and rollback plans
+
+```
+Run purple-team-exercise for "persistence" in a "windows" environment
+```
+
+**`detection-quality-review`**
+- Deep-dive analysis of detection effectiveness
+- Bypass and evasion analysis
+- Quality scoring and improvement recommendations
+- Enhanced detection logic suggestions
+
+```
+Use detection-quality-review for T1059.001
+```
+
+#### 📊 Planning & Reporting Prompts
+
+**`detection-engineering-sprint`**
+- Threat-informed backlog prioritization
+- User stories with acceptance criteria
+- Effort estimation and capacity planning
+- Focus areas: ransomware, apt, insider, cloud, balanced
+
+```
+Run detection-engineering-sprint with sprint_capacity 5 and threat_focus "apt"
+```
+
+**`executive-security-briefing`**
+- Business-risk translation
+- Coverage metrics and trends
+- Investment recommendations with ROI
+- Audience-specific formatting (board, CISO, CTO)
+
+```
+Use executive-security-briefing for audience "board" with include_benchmarks true
+```
+
+#### 🚨 Incident Response Prompts
+
+**`soc-investigation-assist`**
+- Alert triage guidance
+- MITRE ATT&CK context
+- Related detections and hunting queries
+- Escalation decision trees
+
+```
+Use soc-investigation-assist for "suspicious PowerShell execution" with context "domain controller, after hours"
+```
+
+**`cve-response-assessment`**
+- Rapid threat assessment
+- Existing coverage check
+- Immediate action recommendations
+- Hunting query generation
+
+```
+Run cve-response-assessment for CVE-2024-27198
+```
+
+#### 🔧 Gap Analysis Prompts
+
+**`data-source-gap-analysis`**
+- Telemetry requirements analysis
+- Data source prioritization by ROI
+- Implementation roadmap
+- Cost-benefit analysis
+
+```
+Use data-source-gap-analysis for target_coverage "credential-access"
+```
+
+**`detection-coverage-diff`**
+- Compare against threat actors or baselines
+- Progress tracking
+- Path-to-parity planning
+- Effort estimation
+
+```
+Run detection-coverage-diff comparing against "APT29"
+```
+
+### Best With: MITRE ATT&CK MCP
+
+These prompts work even better when paired with [mitre-attack-mcp](https://github.com/MHaggis/mitre-attack-mcp). The prompts will automatically leverage MITRE ATT&CK tools for:
+- Threat actor technique lookups
+- Technique details and detection guidance
+- Mitigation recommendations
 
 ## Claude Code Skills
 
@@ -246,21 +540,43 @@ Total: ~5KB of data vs ~500KB with traditional tools
 
 ## Example Workflows
 
-### Find PowerShell Detections
+### Using MCP Prompts (Recommended for Complex Tasks)
+
+```
+# Comprehensive ransomware assessment
+You: "Use the ransomware-readiness-assessment prompt"
+→ Full kill-chain analysis with risk scoring and remediation roadmap
+
+# Assess coverage against a specific APT
+You: "Run apt-threat-emulation for Volt Typhoon"
+→ Technique-by-technique coverage analysis with test plan
+
+# Generate a sprint backlog
+You: "Use detection-engineering-sprint with capacity 5 focusing on apt threats"
+→ Prioritized user stories with acceptance criteria
+
+# Executive reporting
+You: "Run executive-security-briefing for the board"
+→ Business-risk language with investment recommendations
+```
+
+### Using Tools Directly (Quick Queries)
+
+#### Find PowerShell Detections
 
 ```
 LLM: "Find me PowerShell detections related to base64 encoding"
 Tool: search(query="powershell base64", limit=5)
 ```
 
-### Check CVE Coverage
+#### Check CVE Coverage
 
 ```
 LLM: "Do we have detections for CVE-2024-27198?"
 Tool: list_by_cve(cve_id="CVE-2024-27198")
 ```
 
-### Compare Coverage Across Sources
+#### Compare Coverage Across Sources
 
 ```
 LLM: "What detections do we have for credential dumping?"
@@ -268,14 +584,14 @@ Tool: search(query="credential dumping", limit=10)
 → Returns results from Sigma, Splunk, Elastic, AND KQL
 ```
 
-### Find Web Server Attack Detections
+#### Find Web Server Attack Detections
 
 ```
 LLM: "What detections cover IIS web server attacks?"
 Tool: list_by_process_name(process_name="w3wp.exe")
 ```
 
-### Explore a Threat Campaign
+#### Explore a Threat Campaign
 
 ```
 LLM: "Tell me about ransomware detections"
@@ -283,14 +599,14 @@ Tool: search_stories(query="ransomware")
 Tool: list_by_analytic_story(story="Ransomware")
 ```
 
-### Find KQL Hunting Queries for Defender
+#### Find KQL Hunting Queries for Defender
 
 ```
 LLM: "What KQL queries do we have for Defender For Endpoint?"
 Tool: list_by_kql_category(category="Defender For Endpoint")
 ```
 
-### Search for BloodHound Detections
+#### Search for BloodHound Detections
 
 ```
 LLM: "Find detections for BloodHound usage"
@@ -431,10 +747,36 @@ When fully indexed with all sources:
 
 | MCP | Purpose |
 |-----|---------|
-| **security-detections-mcp** | Query 7,200+ detection rules (Sigma, Splunk ESCU, Elastic, KQL) |
-| **mitre-attack-mcp** | Analyze coverage against ATT&CK framework, generate Navigator layers |
+| **security-detections-mcp** | Query 7,200+ detection rules + 11 expert workflow prompts |
+| **mitre-attack-mcp** | ATT&CK framework data, threat groups, Navigator layers |
 
-### Combined Workflow (Efficient)
+### With MCP Prompts (Easiest)
+
+The prompts automatically leverage both MCPs for comprehensive analysis:
+
+```
+You: "Run apt-threat-emulation for APT29"
+
+The prompt automatically:
+1. Uses mitre-attack-mcp to get APT29's profile and techniques
+2. Uses security-detections-mcp to check coverage for each technique
+3. Calculates coverage percentage and identifies gaps
+4. Generates purple team test plan
+5. Outputs professional report with recommendations
+```
+
+```
+You: "Use threat-landscape-sync for the finance industry"
+
+The prompt automatically:
+1. Gets top threat actors from mitre-attack-mcp
+2. Filters by industry relevance
+3. Analyzes your coverage against each actor
+4. Prioritizes detection investments
+5. Creates strategic roadmap
+```
+
+### With Tools Directly (More Control)
 
 ```
 You: "What's my coverage against APT29?"
@@ -447,21 +789,19 @@ LLM workflow (3 calls, ~10KB total):
 Result: Prioritized gap list, not 500KB of raw data
 ```
 
-### Generate Navigator Layer (1 call)
+### Generate Navigator Layer
 
 ```
 You: "Generate a Navigator layer for my initial access coverage"
 
-LLM: generate_navigator_layer(
-  name="Initial Access Coverage",
-  source_type="elastic",
-  tactic="initial-access"
-)
+LLM workflow:
+1. detections-mcp → get_technique_ids(tactic="initial-access")  # Get covered technique IDs
+2. mitre-attack-mcp → generate_coverage_layer(covered_ids, "Initial Access Coverage")
 
 → Returns ready-to-import Navigator JSON
 ```
 
-### Install Both Together
+### Install Both Together (Recommended)
 
 ```json
 {
