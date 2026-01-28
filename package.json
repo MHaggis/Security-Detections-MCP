@@ -1,6 +1,6 @@
 {
   "name": "security-detections-mcp",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "MCP server for querying Sigma, Splunk ESCU, Elastic, and KQL security detection rules",
   "type": "module",
   "main": "dist/index.js",
