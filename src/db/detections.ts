@@ -1,196 +1,177 @@
-import Database from 'better-sqlite3';
-import { homedir } from 'os';
-import { join } from 'path';
-import { mkdirSync, existsSync, unlinkSync } from 'fs';
-import type { Detection, IndexStats, AnalyticStory } from './types.js';
+/**
+ * Detections Database Module
+ * 
+ * CRUD operations, search, filtering, coverage analysis, and gap identification
+ * for security detections.
+ */
 
-const CACHE_DIR = join(homedir(), '.cache', 'security-detections-mcp');
-const DB_PATH = join(CACHE_DIR, 'detections.sqlite');
+import type { Detection, IndexStats } from '../types.js';
+import { getDb } from './connection.js';
+import { safeJsonParse } from '../utils/helpers.js';
 
-let db: Database.Database | null = null;
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
 
-export function getDbPath(): string {
-  return DB_PATH;
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+  similar?: string[];
 }
 
-export function initDb(): Database.Database {
-  if (db) return db;
-  
-  // Ensure cache directory exists
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
-  }
-  
-  db = new Database(DB_PATH);
-  
-  // Create main detections table with all enhanced fields
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS detections (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      query TEXT,
-      source_type TEXT NOT NULL,
-      mitre_ids TEXT,
-      logsource_category TEXT,
-      logsource_product TEXT,
-      logsource_service TEXT,
-      severity TEXT,
-      status TEXT,
-      author TEXT,
-      date_created TEXT,
-      date_modified TEXT,
-      refs TEXT,
-      falsepositives TEXT,
-      tags TEXT,
-      file_path TEXT,
-      raw_yaml TEXT,
-      cves TEXT,
-      analytic_stories TEXT,
-      data_sources TEXT,
-      detection_type TEXT,
-      asset_type TEXT,
-      security_domain TEXT,
-      process_names TEXT,
-      file_paths TEXT,
-      registry_paths TEXT,
-      mitre_tactics TEXT,
-      platforms TEXT,
-      kql_category TEXT,
-      kql_tags TEXT,
-      kql_keywords TEXT
-    )
-  `);
-  
-  // Create FTS5 virtual table for full-text search with all searchable fields
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS detections_fts USING fts5(
-      id,
-      name,
-      description,
-      query,
-      mitre_ids,
-      tags,
-      cves,
-      analytic_stories,
-      data_sources,
-      process_names,
-      file_paths,
-      registry_paths,
-      mitre_tactics,
-      platforms,
-      kql_category,
-      kql_tags,
-      kql_keywords,
-      content='detections',
-      content_rowid='rowid'
-    )
-  `);
-  
-  // Create triggers to keep FTS in sync
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_ai AFTER INSERT ON detections BEGIN
-      INSERT INTO detections_fts(rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.query, NEW.mitre_ids, NEW.tags, NEW.cves, NEW.analytic_stories, NEW.data_sources, NEW.process_names, NEW.file_paths, NEW.registry_paths, NEW.mitre_tactics, NEW.platforms, NEW.kql_category, NEW.kql_tags, NEW.kql_keywords);
-    END
-  `);
-  
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_ad AFTER DELETE ON detections BEGIN
-      INSERT INTO detections_fts(detections_fts, rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.query, OLD.mitre_ids, OLD.tags, OLD.cves, OLD.analytic_stories, OLD.data_sources, OLD.process_names, OLD.file_paths, OLD.registry_paths, OLD.mitre_tactics, OLD.platforms, OLD.kql_category, OLD.kql_tags, OLD.kql_keywords);
-    END
-  `);
-  
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_au AFTER UPDATE ON detections BEGIN
-      INSERT INTO detections_fts(detections_fts, rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.query, OLD.mitre_ids, OLD.tags, OLD.cves, OLD.analytic_stories, OLD.data_sources, OLD.process_names, OLD.file_paths, OLD.registry_paths, OLD.mitre_tactics, OLD.platforms, OLD.kql_category, OLD.kql_tags, OLD.kql_keywords);
-      INSERT INTO detections_fts(rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.query, NEW.mitre_ids, NEW.tags, NEW.cves, NEW.analytic_stories, NEW.data_sources, NEW.process_names, NEW.file_paths, NEW.registry_paths, NEW.mitre_tactics, NEW.platforms, NEW.kql_category, NEW.kql_tags, NEW.kql_keywords);
-    END
-  `);
-  
-  // Create indexes for common queries
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_source_type ON detections(source_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_severity ON detections(severity)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_logsource_product ON detections(logsource_product)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_logsource_category ON detections(logsource_category)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_detection_type ON detections(detection_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_asset_type ON detections(asset_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_security_domain ON detections(security_domain)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_kql_category ON detections(kql_category)`);
-  
-  // Create stories table (optional - provides rich context for analytic stories)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS stories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      narrative TEXT,
-      author TEXT,
-      date TEXT,
-      version INTEGER,
-      status TEXT,
-      refs TEXT,
-      category TEXT,
-      usecase TEXT,
-      detection_names TEXT
-    )
-  `);
-  
-  // Create FTS5 for stories (narrative is key for semantic search!)
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS stories_fts USING fts5(
-      id,
-      name,
-      description,
-      narrative,
-      category,
-      usecase,
-      content='stories',
-      content_rowid='rowid'
-    )
-  `);
-  
-  // Triggers for stories FTS
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS stories_ai AFTER INSERT ON stories BEGIN
-      INSERT INTO stories_fts(rowid, id, name, description, narrative, category, usecase)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.narrative, NEW.category, NEW.usecase);
-    END
-  `);
-  
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS stories_ad AFTER DELETE ON stories BEGIN
-      INSERT INTO stories_fts(stories_fts, rowid, id, name, description, narrative, category, usecase)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.narrative, OLD.category, OLD.usecase);
-    END
-  `);
-  
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_story_category ON stories(category)`);
-  
-  return db;
+export interface TechniqueIdFilters {
+  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql';
+  tactic?: string;
+  severity?: string;
 }
 
-export function clearDb(): void {
-  const database = initDb();
-  database.exec('DELETE FROM detections');
+export interface CoverageReport {
+  summary: {
+    total_techniques: number;
+    total_detections: number;
+    coverage_by_tactic: Record<string, { covered: number; total: number; percent: number }>;
+  };
+  top_covered: Array<{ technique: string; detection_count: number }>;
+  weak_coverage: Array<{ technique: string; detection_count: number }>;
 }
 
-// Force recreation of the database (needed when schema changes)
-export function recreateDb(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
-  if (existsSync(DB_PATH)) {
-    unlinkSync(DB_PATH);
-  }
+export interface GapAnalysis {
+  threat_profile: string;
+  total_gaps: number;
+  critical_gaps: Array<{ technique: string; priority: string; reason: string }>;
+  covered: string[];
+  recommendations: string[];
 }
 
+export interface DetectionSuggestion {
+  technique_id: string;
+  existing_detections: Array<{ id: string; name: string; source: string }>;
+  data_sources_needed: string[];
+  detection_ideas: string[];
+}
+
+export interface NavigatorLayerOptions {
+  name: string;
+  description?: string;
+  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql';
+  tactic?: string;
+  severity?: string;
+}
+
+export interface DetectionListItem {
+  name: string;
+  id: string;
+  source_type: string;
+  mitre_ids: string[];
+  severity: string | null;
+}
+
+export interface SourceComparisonResult {
+  topic: string;
+  total_found: number;
+  by_source: Record<string, DetectionListItem[]>;
+  by_tactic: Record<string, Record<string, number>>;
+  summary: {
+    source_counts: Record<string, number>;
+    tactic_coverage: Record<string, string[]>;
+  };
+}
+
+// =============================================================================
+// THREAT PROFILES
+// =============================================================================
+
+const THREAT_PROFILES: Record<string, string[]> = {
+  ransomware: [
+    'T1486', 'T1490', 'T1027', 'T1547.001', 'T1059.001', 'T1059.003',
+    'T1562.001', 'T1112', 'T1070.004', 'T1048', 'T1567', 'T1078',
+    'T1566.001', 'T1204.002', 'T1055', 'T1543.003'
+  ],
+  apt: [
+    'T1003.001', 'T1003.002', 'T1003.003', 'T1021.001', 'T1021.002',
+    'T1053.005', 'T1071.001', 'T1071.004', 'T1105', 'T1027', 'T1055',
+    'T1078', 'T1136', 'T1098', 'T1087', 'T1069', 'T1018', 'T1082'
+  ],
+  'initial-access': [
+    'T1566.001', 'T1566.002', 'T1190', 'T1078', 'T1133', 'T1200',
+    'T1091', 'T1195.002', 'T1199', 'T1189'
+  ],
+  persistence: [
+    'T1547.001', 'T1547.004', 'T1543.003', 'T1053.005', 'T1136.001',
+    'T1098', 'T1505.003', 'T1546.001', 'T1574.001', 'T1574.002'
+  ],
+  'credential-access': [
+    'T1003.001', 'T1003.002', 'T1003.003', 'T1003.004', 'T1003.006',
+    'T1555', 'T1552.001', 'T1110', 'T1558.003', 'T1539', 'T1606.001'
+  ],
+  'defense-evasion': [
+    'T1027', 'T1070.001', 'T1070.004', 'T1055', 'T1036', 'T1562.001',
+    'T1218', 'T1112', 'T1140', 'T1202', 'T1564.001'
+  ]
+};
+
+// =============================================================================
+// INTERNAL HELPERS
+// =============================================================================
+
+function rowToDetection(row: Record<string, unknown>): Detection {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: row.description as string || '',
+    query: row.query as string || '',
+    source_type: row.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql',
+    mitre_ids: safeJsonParse<string[]>(row.mitre_ids as string, []),
+    logsource_category: row.logsource_category as string | null,
+    logsource_product: row.logsource_product as string | null,
+    logsource_service: row.logsource_service as string | null,
+    severity: row.severity as string | null,
+    status: row.status as string | null,
+    author: row.author as string | null,
+    date_created: row.date_created as string | null,
+    date_modified: row.date_modified as string | null,
+    references: safeJsonParse<string[]>(row.refs as string, []),
+    falsepositives: safeJsonParse<string[]>(row.falsepositives as string, []),
+    tags: safeJsonParse<string[]>(row.tags as string, []),
+    file_path: row.file_path as string,
+    raw_yaml: row.raw_yaml as string,
+    cves: safeJsonParse<string[]>(row.cves as string, []),
+    analytic_stories: safeJsonParse<string[]>(row.analytic_stories as string, []),
+    data_sources: safeJsonParse<string[]>(row.data_sources as string, []),
+    detection_type: row.detection_type as string | null,
+    asset_type: row.asset_type as string | null,
+    security_domain: row.security_domain as string | null,
+    process_names: safeJsonParse<string[]>(row.process_names as string, []),
+    file_paths: safeJsonParse<string[]>(row.file_paths as string, []),
+    registry_paths: safeJsonParse<string[]>(row.registry_paths as string, []),
+    mitre_tactics: safeJsonParse<string[]>(row.mitre_tactics as string, []),
+    platforms: safeJsonParse<string[]>(row.platforms as string, []),
+    kql_category: row.kql_category as string | null,
+    kql_tags: safeJsonParse<string[]>(row.kql_tags as string, []),
+    kql_keywords: safeJsonParse<string[]>(row.kql_keywords as string, []),
+  };
+}
+
+function rowToListItem(row: Record<string, unknown>): DetectionListItem {
+  return {
+    name: row.name as string,
+    id: row.id as string,
+    source_type: row.source_type as string,
+    mitre_ids: safeJsonParse<string[]>(row.mitre_ids as string, []),
+    severity: row.severity as string | null,
+  };
+}
+
+// =============================================================================
+// CRUD OPERATIONS
+// =============================================================================
+
+/**
+ * Insert or replace a detection in the database.
+ */
 export function insertDetection(detection: Detection): void {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     INSERT OR REPLACE INTO detections 
@@ -239,48 +220,48 @@ export function insertDetection(detection: Detection): void {
   );
 }
 
-function rowToDetection(row: Record<string, unknown>): Detection {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    description: row.description as string || '',
-    query: row.query as string || '',
-    source_type: row.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql',
-    mitre_ids: JSON.parse(row.mitre_ids as string || '[]'),
-    logsource_category: row.logsource_category as string | null,
-    logsource_product: row.logsource_product as string | null,
-    logsource_service: row.logsource_service as string | null,
-    severity: row.severity as string | null,
-    status: row.status as string | null,
-    author: row.author as string | null,
-    date_created: row.date_created as string | null,
-    date_modified: row.date_modified as string | null,
-    references: JSON.parse(row.refs as string || '[]'),
-    falsepositives: JSON.parse(row.falsepositives as string || '[]'),
-    tags: JSON.parse(row.tags as string || '[]'),
-    file_path: row.file_path as string,
-    raw_yaml: row.raw_yaml as string,
-    cves: JSON.parse(row.cves as string || '[]'),
-    analytic_stories: JSON.parse(row.analytic_stories as string || '[]'),
-    data_sources: JSON.parse(row.data_sources as string || '[]'),
-    detection_type: row.detection_type as string | null,
-    asset_type: row.asset_type as string | null,
-    security_domain: row.security_domain as string | null,
-    process_names: JSON.parse(row.process_names as string || '[]'),
-    file_paths: JSON.parse(row.file_paths as string || '[]'),
-    registry_paths: JSON.parse(row.registry_paths as string || '[]'),
-    mitre_tactics: JSON.parse(row.mitre_tactics as string || '[]'),
-    platforms: JSON.parse(row.platforms as string || '[]'),
-    kql_category: row.kql_category as string | null,
-    kql_tags: JSON.parse(row.kql_tags as string || '[]'),
-    kql_keywords: JSON.parse(row.kql_keywords as string || '[]'),
-  };
+/**
+ * Get a detection by its ID.
+ */
+export function getDetectionById(id: string): Detection | null {
+  const database = getDb();
+  
+  const stmt = database.prepare('SELECT * FROM detections WHERE id = ?');
+  const row = stmt.get(id) as Record<string, unknown> | undefined;
+  
+  return row ? rowToDetection(row) : null;
 }
 
-export function searchDetections(query: string, limit: number = 50): Detection[] {
-  const database = initDb();
+/**
+ * Get the raw YAML content for a detection.
+ */
+export function getRawYaml(id: string): string | null {
+  const database = getDb();
   
-  // Use FTS5 for search
+  const stmt = database.prepare('SELECT raw_yaml FROM detections WHERE id = ?');
+  const row = stmt.get(id) as { raw_yaml: string } | undefined;
+  
+  return row?.raw_yaml || null;
+}
+
+/**
+ * Get the total count of detections.
+ */
+export function getDetectionCount(): number {
+  const database = getDb();
+  return (database.prepare('SELECT COUNT(*) as count FROM detections').get() as { count: number }).count;
+}
+
+// =============================================================================
+// SEARCH AND LIST OPERATIONS
+// =============================================================================
+
+/**
+ * Full-text search across detections.
+ */
+export function searchDetections(query: string, limit: number = 50): Detection[] {
+  const database = getDb();
+  
   const stmt = database.prepare(`
     SELECT d.* FROM detections d
     JOIN detections_fts fts ON d.rowid = fts.rowid
@@ -293,17 +274,11 @@ export function searchDetections(query: string, limit: number = 50): Detection[]
   return rows.map(rowToDetection);
 }
 
-export function getDetectionById(id: string): Detection | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT * FROM detections WHERE id = ?');
-  const row = stmt.get(id) as Record<string, unknown> | undefined;
-  
-  return row ? rowToDetection(row) : null;
-}
-
+/**
+ * List detections with pagination.
+ */
 export function listDetections(limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare('SELECT * FROM detections ORDER BY name LIMIT ? OFFSET ?');
   const rows = stmt.all(limit, offset) as Record<string, unknown>[];
@@ -311,8 +286,11 @@ export function listDetections(limit: number = 100, offset: number = 0): Detecti
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections filtered by source type.
+ */
 export function listBySource(sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql', limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare('SELECT * FROM detections WHERE source_type = ? ORDER BY name LIMIT ? OFFSET ?');
   const rows = stmt.all(sourceType, limit, offset) as Record<string, unknown>[];
@@ -320,10 +298,12 @@ export function listBySource(sourceType: 'sigma' | 'splunk_escu' | 'elastic' | '
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by MITRE technique ID.
+ */
 export function listByMitre(techniqueId: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
-  // Search in JSON array
   const stmt = database.prepare(`
     SELECT * FROM detections 
     WHERE mitre_ids LIKE ? 
@@ -335,6 +315,9 @@ export function listByMitre(techniqueId: string, limit: number = 100, offset: nu
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by logsource attributes.
+ */
 export function listByLogsource(
   category?: string,
   product?: string,
@@ -342,7 +325,7 @@ export function listByLogsource(
   limit: number = 100,
   offset: number = 0
 ): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   let sql = 'SELECT * FROM detections WHERE 1=1';
   const params: (string | number)[] = [];
@@ -369,8 +352,11 @@ export function listByLogsource(
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by severity level.
+ */
 export function listBySeverity(level: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare('SELECT * FROM detections WHERE severity = ? ORDER BY name LIMIT ? OFFSET ?');
   const rows = stmt.all(level, limit, offset) as Record<string, unknown>[];
@@ -378,10 +364,11 @@ export function listBySeverity(level: string, limit: number = 100, offset: numbe
   return rows.map(rowToDetection);
 }
 
-// New query methods for enhanced fields
-
+/**
+ * List detections by CVE ID.
+ */
 export function listByCve(cveId: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections 
@@ -394,8 +381,11 @@ export function listByCve(cveId: string, limit: number = 100, offset: number = 0
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by analytic story name.
+ */
 export function listByAnalyticStory(story: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections 
@@ -408,8 +398,11 @@ export function listByAnalyticStory(story: string, limit: number = 100, offset: 
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by process name.
+ */
 export function listByProcessName(processName: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections 
@@ -422,8 +415,11 @@ export function listByProcessName(processName: string, limit: number = 100, offs
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by detection type.
+ */
 export function listByDetectionType(detectionType: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare('SELECT * FROM detections WHERE detection_type = ? ORDER BY name LIMIT ? OFFSET ?');
   const rows = stmt.all(detectionType, limit, offset) as Record<string, unknown>[];
@@ -431,8 +427,11 @@ export function listByDetectionType(detectionType: string, limit: number = 100, 
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by data source.
+ */
 export function listByDataSource(dataSource: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections 
@@ -445,8 +444,11 @@ export function listByDataSource(dataSource: string, limit: number = 100, offset
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by KQL category.
+ */
 export function listByKqlCategory(category: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections
@@ -459,8 +461,11 @@ export function listByKqlCategory(category: string, limit: number = 100, offset:
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by KQL tag.
+ */
 export function listByKqlTag(tag: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections
@@ -473,8 +478,11 @@ export function listByKqlTag(tag: string, limit: number = 100, offset: number = 
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by KQL data source.
+ */
 export function listByKqlDatasource(dataSource: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections
@@ -487,8 +495,11 @@ export function listByKqlDatasource(dataSource: string, limit: number = 100, off
   return rows.map(rowToDetection);
 }
 
+/**
+ * List detections by MITRE tactic.
+ */
 export function listByMitreTactic(tactic: string, limit: number = 100, offset: number = 0): Detection[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT * FROM detections 
@@ -501,8 +512,15 @@ export function listByMitreTactic(tactic: string, limit: number = 100, offset: n
   return rows.map(rowToDetection);
 }
 
+// =============================================================================
+// STATISTICS
+// =============================================================================
+
+/**
+ * Get comprehensive statistics about the indexed detections.
+ */
 export function getStats(): IndexStats {
-  const database = initDb();
+  const database = getDb();
   
   const total = (database.prepare('SELECT COUNT(*) as count FROM detections').get() as { count: number }).count;
   const sigma = (database.prepare("SELECT COUNT(*) as count FROM detections WHERE source_type = 'sigma'").get() as { count: number }).count;
@@ -556,7 +574,7 @@ export function getStats(): IndexStats {
   
   const by_mitre_tactic: Record<string, number> = {};
   for (const row of tacticRows) {
-    const tactics = JSON.parse(row.mitre_tactics) as string[];
+    const tactics = safeJsonParse<string[]>(row.mitre_tactics as string, []);
     for (const tactic of tactics) {
       by_mitre_tactic[tactic] = (by_mitre_tactic[tactic] || 0) + 1;
     }
@@ -607,152 +625,20 @@ export function getStats(): IndexStats {
     by_detection_type,
     stories_count,
     by_story_category,
-    by_elastic_index: {},  // Could be populated if needed
+    by_elastic_index: {},
   };
 }
 
-export function getRawYaml(id: string): string | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT raw_yaml FROM detections WHERE id = ?');
-  const row = stmt.get(id) as { raw_yaml: string } | undefined;
-  
-  return row?.raw_yaml || null;
-}
-
-export function dbExists(): boolean {
-  return existsSync(DB_PATH);
-}
-
-export function getDetectionCount(): number {
-  if (!dbExists()) return 0;
-  const database = initDb();
-  return (database.prepare('SELECT COUNT(*) as count FROM detections').get() as { count: number }).count;
-}
-
-// Story-related functions
-
-export function insertStory(story: AnalyticStory): void {
-  const database = initDb();
-  
-  const stmt = database.prepare(`
-    INSERT OR REPLACE INTO stories 
-    (id, name, description, narrative, author, date, version, status, refs, category, usecase, detection_names)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  stmt.run(
-    story.id,
-    story.name,
-    story.description,
-    story.narrative,
-    story.author,
-    story.date,
-    story.version,
-    story.status,
-    JSON.stringify(story.references),
-    story.category,
-    story.usecase,
-    JSON.stringify(story.detection_names)
-  );
-}
-
-function rowToStory(row: Record<string, unknown>): AnalyticStory {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    description: row.description as string || '',
-    narrative: row.narrative as string || '',
-    author: row.author as string | null,
-    date: row.date as string | null,
-    version: row.version as number | null,
-    status: row.status as string | null,
-    references: JSON.parse(row.refs as string || '[]'),
-    category: row.category as string | null,
-    usecase: row.usecase as string | null,
-    detection_names: JSON.parse(row.detection_names as string || '[]'),
-  };
-}
-
-export function getStoryByName(name: string): AnalyticStory | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT * FROM stories WHERE name = ?');
-  const row = stmt.get(name) as Record<string, unknown> | undefined;
-  
-  return row ? rowToStory(row) : null;
-}
-
-export function getStoryById(id: string): AnalyticStory | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT * FROM stories WHERE id = ?');
-  const row = stmt.get(id) as Record<string, unknown> | undefined;
-  
-  return row ? rowToStory(row) : null;
-}
-
-export function searchStories(query: string, limit: number = 20): AnalyticStory[] {
-  const database = initDb();
-  
-  try {
-    const stmt = database.prepare(`
-      SELECT s.* FROM stories s
-      JOIN stories_fts fts ON s.rowid = fts.rowid
-      WHERE stories_fts MATCH ?
-      ORDER BY rank
-      LIMIT ?
-    `);
-    
-    const rows = stmt.all(query, limit) as Record<string, unknown>[];
-    return rows.map(rowToStory);
-  } catch {
-    // If no stories indexed, return empty
-    return [];
-  }
-}
-
-export function listStories(limit: number = 100, offset: number = 0): AnalyticStory[] {
-  const database = initDb();
-  
-  try {
-    const stmt = database.prepare('SELECT * FROM stories ORDER BY name LIMIT ? OFFSET ?');
-    const rows = stmt.all(limit, offset) as Record<string, unknown>[];
-    return rows.map(rowToStory);
-  } catch {
-    return [];
-  }
-}
-
-export function listStoriesByCategory(category: string, limit: number = 100, offset: number = 0): AnalyticStory[] {
-  const database = initDb();
-  
-  try {
-    const stmt = database.prepare('SELECT * FROM stories WHERE category = ? ORDER BY name LIMIT ? OFFSET ?');
-    const rows = stmt.all(category, limit, offset) as Record<string, unknown>[];
-    return rows.map(rowToStory);
-  } catch {
-    return [];
-  }
-}
-
-export function getStoryCount(): number {
-  const database = initDb();
-  try {
-    return (database.prepare('SELECT COUNT(*) as count FROM stories').get() as { count: number }).count;
-  } catch {
-    return 0;
-  }
-}
-
 // =============================================================================
-// COMPLETION HELPER FUNCTIONS - For autocomplete suggestions
+// COMPLETION HELPERS
 // =============================================================================
 
+/**
+ * Get distinct technique IDs matching a prefix for autocomplete.
+ */
 export function getDistinctTechniqueIds(prefix: string, limit: number = 10): string[] {
-  const database = initDb();
+  const database = getDb();
   
-  // Get all technique IDs and filter by prefix
   const rows = database.prepare(`
     SELECT DISTINCT mitre_ids FROM detections 
     WHERE mitre_ids != '[]' AND mitre_ids IS NOT NULL
@@ -760,7 +646,7 @@ export function getDistinctTechniqueIds(prefix: string, limit: number = 10): str
   
   const techniqueSet = new Set<string>();
   for (const row of rows) {
-    const ids = JSON.parse(row.mitre_ids) as string[];
+    const ids = safeJsonParse<string[]>(row.mitre_ids as string, []);
     for (const id of ids) {
       if (id.toUpperCase().startsWith(prefix.toUpperCase())) {
         techniqueSet.add(id);
@@ -771,10 +657,12 @@ export function getDistinctTechniqueIds(prefix: string, limit: number = 10): str
   return Array.from(techniqueSet).sort().slice(0, limit);
 }
 
+/**
+ * Get distinct CVE IDs matching a prefix for autocomplete.
+ */
 export function getDistinctCves(prefix: string, limit: number = 10): string[] {
-  const database = initDb();
+  const database = getDb();
   
-  // Get all CVEs and filter by prefix
   const rows = database.prepare(`
     SELECT DISTINCT cves FROM detections 
     WHERE cves != '[]' AND cves IS NOT NULL
@@ -782,7 +670,7 @@ export function getDistinctCves(prefix: string, limit: number = 10): string[] {
   
   const cveSet = new Set<string>();
   for (const row of rows) {
-    const cvelist = JSON.parse(row.cves) as string[];
+    const cvelist = safeJsonParse<string[]>(row.cves as string, []);
     for (const cve of cvelist) {
       if (cve.toUpperCase().startsWith(prefix.toUpperCase())) {
         cveSet.add(cve);
@@ -793,10 +681,12 @@ export function getDistinctCves(prefix: string, limit: number = 10): string[] {
   return Array.from(cveSet).sort().slice(0, limit);
 }
 
+/**
+ * Get distinct process names matching a prefix for autocomplete.
+ */
 export function getDistinctProcessNames(prefix: string, limit: number = 10): string[] {
-  const database = initDb();
+  const database = getDb();
   
-  // Get all process names and filter by prefix
   const rows = database.prepare(`
     SELECT DISTINCT process_names FROM detections 
     WHERE process_names != '[]' AND process_names IS NOT NULL
@@ -804,7 +694,7 @@ export function getDistinctProcessNames(prefix: string, limit: number = 10): str
   
   const processSet = new Set<string>();
   for (const row of rows) {
-    const procs = JSON.parse(row.process_names) as string[];
+    const procs = safeJsonParse<string[]>(row.process_names as string, []);
     for (const proc of procs) {
       if (proc.toLowerCase().startsWith(prefix.toLowerCase())) {
         processSet.add(proc);
@@ -816,18 +706,13 @@ export function getDistinctProcessNames(prefix: string, limit: number = 10): str
 }
 
 // =============================================================================
-// INPUT VALIDATION - With did-you-mean suggestions
+// INPUT VALIDATION
 // =============================================================================
 
-export interface ValidationResult {
-  valid: boolean;
-  error?: string;
-  suggestion?: string;
-  similar?: string[];
-}
-
+/**
+ * Validate a MITRE technique ID with suggestions.
+ */
 export function validateTechniqueId(id: string): ValidationResult {
-  // Check format: T followed by 4 digits, optionally .3 more digits
   if (!id.match(/^T\d{4}(\.\d{3})?$/)) {
     return { 
       valid: false, 
@@ -836,9 +721,8 @@ export function validateTechniqueId(id: string): ValidationResult {
     };
   }
   
-  const database = initDb();
+  const database = getDb();
   
-  // Check if this exact technique has detections
   const exact = database.prepare(`
     SELECT 1 FROM detections WHERE mitre_ids LIKE ? LIMIT 1
   `).get(`%"${id}"%`);
@@ -847,10 +731,8 @@ export function validateTechniqueId(id: string): ValidationResult {
     return { valid: true };
   }
   
-  // Find similar techniques that we DO have
   const similar = getDistinctTechniqueIds(id.substring(0, 5), 5);
   
-  // Also check if we have parent or sub-techniques
   const baseId = id.split('.')[0];
   const parentMatch = database.prepare(`
     SELECT 1 FROM detections WHERE mitre_ids LIKE ? LIMIT 1
@@ -880,16 +762,14 @@ export function validateTechniqueId(id: string): ValidationResult {
 }
 
 // =============================================================================
-// Lightweight technique ID extraction - returns ONLY unique technique IDs
+// TECHNIQUE IDS AND COVERAGE ANALYSIS
 // =============================================================================
-export interface TechniqueIdFilters {
-  source_type?: 'sigma' | 'splunk_escu' | 'elastic';
-  tactic?: string;
-  severity?: string;
-}
 
+/**
+ * Get all unique technique IDs with optional filtering.
+ */
 export function getTechniqueIds(filters: TechniqueIdFilters = {}): string[] {
-  const database = initDb();
+  const database = getDb();
   
   let sql = "SELECT DISTINCT mitre_ids FROM detections WHERE mitre_ids != '[]' AND mitre_ids IS NOT NULL";
   const params: string[] = [];
@@ -910,10 +790,9 @@ export function getTechniqueIds(filters: TechniqueIdFilters = {}): string[] {
   const stmt = database.prepare(sql);
   const rows = stmt.all(...params) as { mitre_ids: string }[];
   
-  // Extract and dedupe all technique IDs
   const techniqueSet = new Set<string>();
   for (const row of rows) {
-    const ids = JSON.parse(row.mitre_ids) as string[];
+    const ids = safeJsonParse<string[]>(row.mitre_ids as string, []);
     for (const id of ids) {
       techniqueSet.add(id);
     }
@@ -922,59 +801,18 @@ export function getTechniqueIds(filters: TechniqueIdFilters = {}): string[] {
   return Array.from(techniqueSet).sort();
 }
 
-// Threat profiles for gap analysis
-const THREAT_PROFILES: Record<string, string[]> = {
-  ransomware: [
-    'T1486', 'T1490', 'T1027', 'T1547.001', 'T1059.001', 'T1059.003',
-    'T1562.001', 'T1112', 'T1070.004', 'T1048', 'T1567', 'T1078',
-    'T1566.001', 'T1204.002', 'T1055', 'T1543.003'
-  ],
-  apt: [
-    'T1003.001', 'T1003.002', 'T1003.003', 'T1021.001', 'T1021.002',
-    'T1053.005', 'T1071.001', 'T1071.004', 'T1105', 'T1027', 'T1055',
-    'T1078', 'T1136', 'T1098', 'T1087', 'T1069', 'T1018', 'T1082'
-  ],
-  'initial-access': [
-    'T1566.001', 'T1566.002', 'T1190', 'T1078', 'T1133', 'T1200',
-    'T1091', 'T1195.002', 'T1199', 'T1189'
-  ],
-  persistence: [
-    'T1547.001', 'T1547.004', 'T1543.003', 'T1053.005', 'T1136.001',
-    'T1098', 'T1505.003', 'T1546.001', 'T1574.001', 'T1574.002'
-  ],
-  'credential-access': [
-    'T1003.001', 'T1003.002', 'T1003.003', 'T1003.004', 'T1003.006',
-    'T1555', 'T1552.001', 'T1110', 'T1558.003', 'T1539', 'T1606.001'
-  ],
-  'defense-evasion': [
-    'T1027', 'T1070.001', 'T1070.004', 'T1055', 'T1036', 'T1562.001',
-    'T1218', 'T1112', 'T1140', 'T1202', 'T1564.001'
-  ]
-};
-
-// Coverage analysis result
-export interface CoverageReport {
-  summary: {
-    total_techniques: number;
-    total_detections: number;
-    coverage_by_tactic: Record<string, { covered: number; total: number; percent: number }>;
-  };
-  top_covered: Array<{ technique: string; detection_count: number }>;
-  weak_coverage: Array<{ technique: string; detection_count: number }>;
-}
-
-// Analyze coverage efficiently
-export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'): CoverageReport {
-  const database = initDb();
+/**
+ * Analyze coverage by tactic and identify strengths/weaknesses.
+ */
+export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql'): CoverageReport {
+  const database = getDb();
   
-  // Get all technique IDs covered
   let countSql = 'SELECT COUNT(DISTINCT id) as count FROM detections';
   if (sourceType) countSql += ' WHERE source_type = ?';
   const totalDetections = sourceType 
     ? (database.prepare(countSql).get(sourceType) as { count: number }).count
     : (database.prepare(countSql).get() as { count: number }).count;
   
-  // Get techniques with counts
   let sql = "SELECT mitre_ids, mitre_tactics FROM detections WHERE mitre_ids != '[]'";
   if (sourceType) sql += ' AND source_type = ?';
   
@@ -982,7 +820,6 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
     ? database.prepare(sql).all(sourceType) as { mitre_ids: string; mitre_tactics: string }[]
     : database.prepare(sql).all() as { mitre_ids: string; mitre_tactics: string }[];
   
-  // Count techniques and tactics
   const techCounts: Record<string, number> = {};
   const tacticCounts: Record<string, Set<string>> = {};
   
@@ -998,8 +835,8 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
   }
   
   for (const row of rows) {
-    const ids = JSON.parse(row.mitre_ids) as string[];
-    const tactics = JSON.parse(row.mitre_tactics || '[]') as string[];
+    const ids = safeJsonParse<string[]>(row.mitre_ids as string, []);
+    const tactics = safeJsonParse<string[]>(row.mitre_tactics as string, []);
     
     for (const id of ids) {
       techCounts[id] = (techCounts[id] || 0) + 1;
@@ -1011,7 +848,6 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
     }
   }
   
-  // Build coverage by tactic (approx totals from ATT&CK)
   const tacticTotals: Record<string, number> = {
     'reconnaissance': 10, 'resource-development': 8, 'initial-access': 10,
     'execution': 14, 'persistence': 20, 'privilege-escalation': 14,
@@ -1031,7 +867,6 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
     };
   }
   
-  // Top covered and weak coverage
   const sorted = Object.entries(techCounts).sort((a, b) => b[1] - a[1]);
   const topCovered = sorted.slice(0, 10).map(([t, c]) => ({ technique: t, detection_count: c }));
   const weakCoverage = sorted.filter(([_, c]) => c === 1).slice(0, 10).map(([t, c]) => ({ technique: t, detection_count: c }));
@@ -1047,26 +882,17 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
   };
 }
 
-// Gap analysis result
-export interface GapAnalysis {
-  threat_profile: string;
-  total_gaps: number;
-  critical_gaps: Array<{ technique: string; priority: string; reason: string }>;
-  covered: string[];
-  recommendations: string[];
-}
-
-// Identify gaps based on threat profile
+/**
+ * Identify gaps based on a threat profile.
+ */
 export function identifyGaps(
   threatProfile: string,
-  sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
+  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql'
 ): GapAnalysis {
   const targetTechniques = THREAT_PROFILES[threatProfile.toLowerCase()] || THREAT_PROFILES['apt'];
   
-  // Get what we have coverage for
   const coveredTechs = new Set(getTechniqueIds({ source_type: sourceType }));
   
-  // Find gaps
   const gaps: Array<{ technique: string; priority: string; reason: string }> = [];
   const covered: string[] = [];
   
@@ -1074,7 +900,6 @@ export function identifyGaps(
     if (coveredTechs.has(tech)) {
       covered.push(tech);
     } else {
-      // Check if we have sub-technique coverage
       const hasSubCoverage = Array.from(coveredTechs).some(t => t.startsWith(tech + '.'));
       const hasParentCoverage = coveredTechs.has(tech.split('.')[0]);
       
@@ -1093,10 +918,8 @@ export function identifyGaps(
     }
   }
   
-  // Sort by priority
   gaps.sort((a, b) => a.priority.localeCompare(b.priority));
   
-  // Generate recommendations
   const recommendations = [
     `${covered.length}/${targetTechniques.length} techniques covered for ${threatProfile}`,
     `${gaps.filter(g => g.priority === 'P0').length} critical gaps (P0) need immediate attention`,
@@ -1115,22 +938,15 @@ export function identifyGaps(
   };
 }
 
-// Detection suggestion
-export interface DetectionSuggestion {
-  technique_id: string;
-  existing_detections: Array<{ id: string; name: string; source: string }>;
-  data_sources_needed: string[];
-  detection_ideas: string[];
-}
-
-// Suggest detections for a technique
+/**
+ * Suggest detections for a technique.
+ */
 export function suggestDetections(
   techniqueId: string,
-  sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
+  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql'
 ): DetectionSuggestion {
-  const database = initDb();
+  const database = getDb();
   
-  // Find existing detections for this technique
   let sql = "SELECT id, name, source_type, data_sources FROM detections WHERE mitre_ids LIKE ?";
   const params: string[] = [`%"${techniqueId}"%`];
   
@@ -1150,14 +966,12 @@ export function suggestDetections(
     source: r.source_type
   }));
   
-  // Collect data sources from existing detections
   const dataSources = new Set<string>();
   for (const row of rows) {
-    const ds = JSON.parse(row.data_sources || '[]') as string[];
+    const ds = safeJsonParse<string[]>(row.data_sources as string, []);
     ds.forEach(d => dataSources.add(d));
   }
   
-  // Generate detection ideas based on technique pattern
   const ideas: string[] = [];
   const techBase = techniqueId.split('.')[0];
   
@@ -1182,15 +996,9 @@ export function suggestDetections(
   };
 }
 
-// Generate Navigator layer directly from detections
-export interface NavigatorLayerOptions {
-  name: string;
-  description?: string;
-  source_type?: 'sigma' | 'splunk_escu' | 'elastic';
-  tactic?: string;
-  severity?: string;
-}
-
+/**
+ * Generate an ATT&CK Navigator layer from detection coverage.
+ */
 export function generateNavigatorLayer(options: NavigatorLayerOptions): object {
   const techniqueIds = getTechniqueIds({
     source_type: options.source_type,
@@ -1198,17 +1006,15 @@ export function generateNavigatorLayer(options: NavigatorLayerOptions): object {
     severity: options.severity,
   });
   
-  // Build techniques array with scores based on detection count
-  const database = initDb();
+  const database = getDb();
   const techniques = [];
   
-  // Color gradient: red (no coverage) -> yellow (low) -> green (good)
   function getColorForScore(score: number): string {
-    if (score >= 80) return '#1a8c1a';  // Dark green - excellent
-    if (score >= 60) return '#8ec843';  // Light green - good
-    if (score >= 40) return '#ffe766';  // Yellow - moderate
-    if (score >= 20) return '#ff9933';  // Orange - low
-    return '#ff6666';                    // Red - minimal
+    if (score >= 80) return '#1a8c1a';
+    if (score >= 60) return '#8ec843';
+    if (score >= 40) return '#ffe766';
+    if (score >= 20) return '#ff9933';
+    return '#ff6666';
   }
   
   for (const techId of techniqueIds) {
@@ -1225,7 +1031,7 @@ export function generateNavigatorLayer(options: NavigatorLayerOptions): object {
     }
     
     const count = (database.prepare(countSql).get(...countParams) as { count: number }).count;
-    const score = Math.min(count * 20, 100); // Scale: 1 detection = 20, max 100
+    const score = Math.min(count * 20, 100);
     
     techniques.push({
       techniqueID: techId,
@@ -1237,7 +1043,6 @@ export function generateNavigatorLayer(options: NavigatorLayerOptions): object {
     });
   }
   
-  // ATT&CK Navigator layer format
   return {
     name: options.name,
     versions: {
@@ -1269,41 +1074,14 @@ export function generateNavigatorLayer(options: NavigatorLayerOptions): object {
 }
 
 // =============================================================================
-// LIGHTWEIGHT DETECTION LIST FUNCTIONS - For fast name+ID retrieval
+// LIGHTWEIGHT LIST FUNCTIONS
 // =============================================================================
 
-export interface DetectionListItem {
-  name: string;
-  id: string;
-  source_type: string;
-  mitre_ids: string[];
-  severity: string | null;
-}
-
-export interface SourceComparisonResult {
-  topic: string;
-  total_found: number;
-  by_source: Record<string, DetectionListItem[]>;
-  by_tactic: Record<string, Record<string, number>>;
-  summary: {
-    source_counts: Record<string, number>;
-    tactic_coverage: Record<string, string[]>;
-  };
-}
-
-function rowToListItem(row: Record<string, unknown>): DetectionListItem {
-  return {
-    name: row.name as string,
-    id: row.id as string,
-    source_type: row.source_type as string,
-    mitre_ids: JSON.parse(row.mitre_ids as string || '[]'),
-    severity: row.severity as string | null,
-  };
-}
-
-// Get just name+ID list for a search query - NO full detection bloat
+/**
+ * Search detections returning only name, ID, and basic info.
+ */
 export function searchDetectionList(query: string, limit: number = 500): DetectionListItem[] {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT d.id, d.name, d.source_type, d.mitre_ids, d.severity 
@@ -1318,13 +1096,15 @@ export function searchDetectionList(query: string, limit: number = 500): Detecti
   return rows.map(rowToListItem);
 }
 
-// Get name+ID list filtered by source
+/**
+ * List detections by source with optional name filter, returning lightweight results.
+ */
 export function listDetectionsBySourceLight(
   sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql',
   nameFilter?: string,
   limit: number = 500
 ): DetectionListItem[] {
-  const database = initDb();
+  const database = getDb();
   
   let sql = 'SELECT id, name, source_type, mitre_ids, severity FROM detections WHERE source_type = ?';
   const params: (string | number)[] = [sourceType];
@@ -1342,11 +1122,12 @@ export function listDetectionsBySourceLight(
   return rows.map(rowToListItem);
 }
 
-// Compare detections across sources for a topic - returns clean structured comparison
+/**
+ * Compare detections across sources for a topic.
+ */
 export function compareDetectionsBySource(topic: string, limit: number = 100): SourceComparisonResult {
-  const database = initDb();
+  const database = getDb();
   
-  // Search for the topic
   const stmt = database.prepare(`
     SELECT d.id, d.name, d.source_type, d.mitre_ids, d.severity, d.mitre_tactics
     FROM detections d
@@ -1358,7 +1139,6 @@ export function compareDetectionsBySource(topic: string, limit: number = 100): S
   
   const rows = stmt.all(topic, limit * 4) as Record<string, unknown>[];
   
-  // Group by source
   const bySource: Record<string, DetectionListItem[]> = {
     sigma: [],
     splunk_escu: [],
@@ -1366,7 +1146,6 @@ export function compareDetectionsBySource(topic: string, limit: number = 100): S
     kql: [],
   };
   
-  // Track tactics per source
   const byTactic: Record<string, Record<string, number>> = {};
   
   for (const row of rows) {
@@ -1379,21 +1158,18 @@ export function compareDetectionsBySource(topic: string, limit: number = 100): S
       }
     }
     
-    // Count tactics
-    const tactics = JSON.parse(row.mitre_tactics as string || '[]') as string[];
+    const tactics = safeJsonParse<string[]>(row.mitre_tactics as string, []);
     for (const tactic of tactics) {
       if (!byTactic[tactic]) byTactic[tactic] = {};
       byTactic[tactic][source] = (byTactic[tactic][source] || 0) + 1;
     }
   }
   
-  // Build summary
   const sourceCounts: Record<string, number> = {};
   for (const [source, items] of Object.entries(bySource)) {
     sourceCounts[source] = items.length;
   }
   
-  // Find tactic coverage gaps
   const tacticCoverage: Record<string, string[]> = {};
   for (const [tactic, sources] of Object.entries(byTactic)) {
     tacticCoverage[tactic] = Object.keys(sources);
@@ -1411,12 +1187,14 @@ export function compareDetectionsBySource(topic: string, limit: number = 100): S
   };
 }
 
-// Get detection names and IDs matching a pattern, grouped by source
+/**
+ * Get detection names and IDs matching a pattern, grouped by source.
+ */
 export function getDetectionNamesByPattern(
   pattern: string,
   sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql'
 ): { source: string; detections: Array<{ name: string; id: string }> }[] {
-  const database = initDb();
+  const database = getDb();
   
   let sql = `
     SELECT id, name, source_type FROM detections 
@@ -1433,7 +1211,6 @@ export function getDetectionNamesByPattern(
   
   const rows = database.prepare(sql).all(...params) as { id: string; name: string; source_type: string }[];
   
-  // Group by source
   const grouped: Record<string, Array<{ name: string; id: string }>> = {};
   for (const row of rows) {
     if (!grouped[row.source_type]) grouped[row.source_type] = [];
@@ -1443,9 +1220,11 @@ export function getDetectionNamesByPattern(
   return Object.entries(grouped).map(([source, detections]) => ({ source, detections }));
 }
 
-// Quick count of detections by source for a topic
+/**
+ * Quick count of detections by source for a topic.
+ */
 export function countDetectionsBySource(topic: string): Record<string, number> {
-  const database = initDb();
+  const database = getDb();
   
   const stmt = database.prepare(`
     SELECT d.source_type, COUNT(*) as count
@@ -1462,99 +1241,4 @@ export function countDetectionsBySource(topic: string): Record<string, number> {
     result[row.source_type] = row.count;
   }
   return result;
-}
-
-// =============================================================================
-// SAVED QUERIES / QUICK RESULTS CACHE
-// =============================================================================
-
-export function initSavedQueriesTable(): void {
-  const database = initDb();
-  
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS saved_queries (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      query_type TEXT NOT NULL,
-      query_params TEXT,
-      result_json TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      expires_at TEXT
-    )
-  `);
-  
-  database.exec(`CREATE INDEX IF NOT EXISTS idx_saved_query_type ON saved_queries(query_type)`);
-  database.exec(`CREATE INDEX IF NOT EXISTS idx_saved_query_name ON saved_queries(name)`);
-}
-
-export function saveQueryResult(
-  name: string,
-  queryType: string,
-  queryParams: Record<string, unknown>,
-  result: unknown,
-  ttlMinutes?: number
-): string {
-  const database = initDb();
-  initSavedQueriesTable();
-  
-  const id = `sq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const expiresAt = ttlMinutes 
-    ? new Date(Date.now() + ttlMinutes * 60 * 1000).toISOString()
-    : null;
-  
-  const stmt = database.prepare(`
-    INSERT OR REPLACE INTO saved_queries (id, name, query_type, query_params, result_json, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  
-  stmt.run(id, name, queryType, JSON.stringify(queryParams), JSON.stringify(result), expiresAt);
-  return id;
-}
-
-export function getSavedQuery(name: string): unknown | null {
-  const database = initDb();
-  initSavedQueriesTable();
-  
-  const stmt = database.prepare(`
-    SELECT result_json, expires_at FROM saved_queries 
-    WHERE name = ? 
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `);
-  
-  const row = stmt.get(name) as { result_json: string; expires_at: string | null } | undefined;
-  
-  if (!row) return null;
-  
-  // Check expiry
-  if (row.expires_at && new Date(row.expires_at) < new Date()) {
-    return null;
-  }
-  
-  return JSON.parse(row.result_json);
-}
-
-export function listSavedQueries(queryType?: string): Array<{ id: string; name: string; query_type: string; created_at: string }> {
-  const database = initDb();
-  initSavedQueriesTable();
-  
-  let sql = 'SELECT id, name, query_type, created_at FROM saved_queries';
-  const params: string[] = [];
-  
-  if (queryType) {
-    sql += ' WHERE query_type = ?';
-    params.push(queryType);
-  }
-  
-  sql += ' ORDER BY created_at DESC LIMIT 50';
-  
-  return database.prepare(sql).all(...params) as Array<{ id: string; name: string; query_type: string; created_at: string }>;
-}
-
-export function deleteSavedQuery(name: string): boolean {
-  const database = initDb();
-  initSavedQueriesTable();
-  
-  const result = database.prepare('DELETE FROM saved_queries WHERE name = ?').run(name);
-  return result.changes > 0;
 }

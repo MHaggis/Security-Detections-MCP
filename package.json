@@ -1,7 +1,8 @@
 {
   "name": "security-detections-mcp",
-  "version": "1.4.1",
-  "description": "MCP server for querying Sigma, Splunk ESCU, Elastic, and KQL security detection rules",
+  "version": "2.1.0",
+  "description": "Advanced MCP server for security detections with Detection Engineering Intelligence, Knowledge Graph (Tribal Knowledge), Elicitation, and Resource Subscriptions",
+  "sigmaSpecVersion": "2.0.0",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -19,7 +20,11 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "test": "npm run build && node tests/integration-test.js && node tests/engineering-tools-test.js",
+    "test:integration": "npm run build && node tests/integration-test.js",
+    "test:engineering": "npm run build && node tests/engineering-tools-test.js",
+    "lint": "tsc --noEmit --strict",
+    "prepublishOnly": "npm run build && npm run lint"
   },
   "keywords": [
     "mcp",
@@ -41,7 +46,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@iarna/toml": "^2.2.5",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "better-sqlite3": "^11.0.0",
     "yaml": "^2.4.0"
   },

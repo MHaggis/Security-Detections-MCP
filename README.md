@@ -4,6 +4,50 @@ An MCP (Model Context Protocol) server that lets LLMs query a unified database o
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInNlY3VyaXR5LWRldGVjdGlvbnMtbWNwIl0sImVudiI6eyJTSUdNQV9QQVRIUyI6Ii9wYXRoL3RvL3NpZ21hL3J1bGVzLC9wYXRoL3RvL3NpZ21hL3J1bGVzLXRocmVhdC1odW50aW5nIiwiU1BMVU5LX1BBVEhTIjoiL3BhdGgvdG8vc2VjdXJpdHlfY29udGVudC9kZXRlY3Rpb25zIiwiU1RPUllfUEFUSFMiOiIvcGF0aC90by9zZWN1cml0eV9jb250ZW50L3N0b3JpZXMiLCJFTEFTVElDX1BBVEhTIjoiL3BhdGgvdG8vZGV0ZWN0aW9uLXJ1bGVzL3J1bGVzIiwiS1FMX1BBVEhTIjoiL3BhdGgvdG8va3FsLXJ1bGVzIn19)
 
+## 🚀 Version 2.1 Features
+
+**Security Detections MCP v2.1** introduces powerful new capabilities for detection engineering intelligence, analytical memory, autonomous analysis, and advanced MCP protocol features:
+
+### What's New in v2.1
+- **Elicitation Support** - Server can request user confirmation for destructive operations (when client supports it)
+- **Sampling Integration** - LLM-enhanced analysis via MCP sampling (when client supports it)
+- **Resource Subscriptions** - Subscribe to resource changes for live updates
+- **Enhanced Error Handling** - Safe JSON parsing and comprehensive error wrapping
+- **Dynamic Pattern Extraction** - Improved field/function extraction without hardcoded limitations
+- **71+ Tools** - Extended tool suite with 2 new sampling-related tools
+
+### Detection Engineering Intelligence (8 Tools)
+- **Pattern Learning** - Automatically extracts and learns patterns from 4 detection formats (SPL, Sigma, KQL, Elastic)
+- **Template Generation** - Creates reusable detection templates from learned patterns
+- **Field & Macro References** - Tracks commonly used fields, macros, and functions across detections
+- **Feedback Learning** - Learns from user corrections and improvements to enhance future suggestions
+
+### Knowledge Graph / Tribal Knowledge (12 Tools)
+- **Analytical Memory** - Persistent knowledge graph that remembers WHY decisions were made, not just WHAT was detected
+- **Entity Management** - Create and relate entities (threats, techniques, detections, data sources)
+- **Decision Logging** - Record analytical reasoning and decision-making context for future reference
+- **Learning Capture** - Store insights, patterns, and lessons learned that help future agents understand context
+
+### Dynamic Tables (6 Tools)
+- **Custom Analysis Storage** - Create tables on-the-fly for storing analysis results, gap assessments, or custom data
+- **Flexible Schema** - Define your own table structure for any analysis workflow
+- **Query Interface** - Query stored analysis data with SQL-like operations
+- **Persistent Storage** - Tables persist across sessions for long-term analysis tracking
+
+### Comprehensive Pattern Extraction
+- **Multi-Format Support** - Extracts patterns from Sigma, Splunk SPL, KQL, and Elastic queries
+- **10,235+ Indexed Patterns** - Comprehensive pattern library covering 528+ MITRE techniques
+- **Cross-Format Insights** - Learn how different platforms detect the same techniques
+
+### Expanded Tool Suite
+- **71+ Total Tools** (vs ~40 in v1.0)
+- **Engineering Tools** (8) - Pattern learning, template generation, field analysis
+- **Knowledge Tools** (12) - Knowledge graph, entity relations, decision logging
+- **Dynamic Tools** (6) - Custom table creation and querying
+- **Autonomous Tools** (5) - Self-directed analysis, LLM-enhanced analysis, sampling status
+- **Meta/Template Tools** (5) - Query templates and workflow shortcuts
+- **Cache Tools** (4) - Index management, saved queries
+
 ## 🆕 MCP Prompts - Expert Detection Workflows
 
 This server includes **11 pre-built MCP Prompts** that provide structured, expert-level workflows for common security detection tasks. Instead of figuring out which tools to use and in what order, just ask for a prompt by name and get a comprehensive, professional analysis.
@@ -413,6 +457,77 @@ These tools do heavy processing server-side and return minimal, actionable data:
 | `prioritize_gaps(threat_profile, source_type?)` | Analyze gaps with P0/P1/P2 prioritization and selection guidance |
 | `plan_detection_sprint()` | Generate sprint configuration options with recommended backlog |
 
+### Engineering Tools (8)
+
+Detection engineering intelligence tools for pattern learning and template generation:
+
+| Tool | Description |
+|------|-------------|
+| `extract_patterns(technique_id, source_type?)` | Extract detection patterns for a technique from all sources |
+| `learn_pattern(technique_id, pattern, format)` | Teach the system a new pattern for a technique |
+| `get_patterns(technique_id, format?)` | Retrieve learned patterns for a technique |
+| `generate_template(technique_id, format, data_source)` | Generate detection template from learned patterns |
+| `analyze_fields(technique_id)` | Analyze commonly used fields/macros for a technique |
+| `get_field_references(field_name)` | Find all detections using a specific field or macro |
+| `suggest_improvements(detection_id)` | Get AI suggestions for improving a detection based on patterns |
+| `compare_patterns(technique_id)` | Compare patterns across different detection formats |
+
+### Knowledge Tools (12)
+
+Knowledge graph and tribal knowledge tools for analytical memory:
+
+| Tool | Description |
+|------|-------------|
+| `create_entity(name, type, properties)` | Create an entity in the knowledge graph (threat, technique, detection, etc.) |
+| `create_relation(source_entity, relation_type, target_entity, reasoning)` | Create a relationship between entities with reasoning |
+| `search_knowledge(query, entity_type?)` | Search the knowledge graph for entities and relations |
+| `get_entity(name)` | Get full details of an entity including all relations |
+| `log_decision(context, decision, reasoning, tags)` | Log an analytical decision with full context for future reference |
+| `get_relevant_decisions(context, tags?)` | Retrieve relevant past decisions for current context |
+| `add_learning(insight, category, tags)` | Store a learning or insight for future agents |
+| `get_learnings(category?, tags?)` | Retrieve stored learnings by category or tags |
+| `link_detection_to_entity(detection_id, entity_name, relation_type)` | Link a detection to a knowledge graph entity |
+| `get_entity_detections(entity_name)` | Get all detections related to an entity |
+| `update_entity(name, properties)` | Update entity properties in the knowledge graph |
+| `delete_entity(name)` | Remove an entity from the knowledge graph |
+
+### Dynamic Tools (6)
+
+Custom table creation and querying for flexible analysis storage:
+
+| Tool | Description |
+|------|-------------|
+| `create_table(table_name, schema)` | Create a custom table with defined schema for analysis storage |
+| `insert_row(table_name, row_data)` | Insert a row of data into a custom table |
+| `query_table(table_name, query, limit?)` | Query a custom table with SQL-like syntax |
+| `list_tables()` | List all custom tables you've created |
+| `get_table_schema(table_name)` | Get the schema of a custom table |
+| `delete_table(table_name)` | Delete a custom table |
+
+### Autonomous Tools (5)
+
+Self-directed analysis tools that work independently:
+
+| Tool | Description |
+|------|-------------|
+| `auto_analyze_coverage(threat_profiles?, store_results?)` | Comprehensive coverage analysis across threat profiles |
+| `auto_gap_report(report_name?, compare_sources?)` | Generate executive-level gap reports with prioritized recommendations |
+| `auto_compare_sources(techniques?, focus_tactic?)` | Compare detection coverage across all sources with reasoning |
+| `llm_enhanced_analysis(analysis_type, threat_profile?)` | LLM-enhanced analysis via MCP sampling (when supported) |
+| `check_sampling_status()` | Check if MCP sampling is available for LLM-enhanced analysis |
+
+### Meta/Template Tools (5)
+
+Query templates and workflow shortcuts:
+
+| Tool | Description |
+|------|-------------|
+| `save_template(name, tool_calls, description)` | Save a sequence of tool calls as a reusable template |
+| `run_template(template_name, variables?)` | Execute a saved template with optional variable substitution |
+| `list_templates()` | List all saved templates |
+| `get_template(template_name)` | Get details of a saved template |
+| `delete_template(template_name)` | Delete a saved template |
+
 ## MCP Prompts - Detailed Reference
 
 MCP Prompts are pre-built, expert-level workflows that guide Claude through complex analysis tasks. They ensure consistent, comprehensive results by defining exactly which tools to use and in what order.
@@ -753,6 +868,55 @@ Supports multiple KQL repositories:
 - Title derived from filename
 - Lightweight queries for kqlsearch.com
 
+## ⚠️ Limitations & Transparency
+
+We believe in being honest about what this tool can and cannot do. Here are the current limitations:
+
+### Pattern Extraction Limitations
+
+The Detection Engineering Intelligence features extract patterns **dynamically** from your detection corpus, but have some inherent limitations:
+
+| Format | Field Extraction | Notes |
+|--------|-----------------|-------|
+| **Splunk SPL** | ✅ Excellent | Extracts from data models, `by` clauses, `stats` commands, `where` filters |
+| **Sigma** | ✅ Excellent | Full YAML parsing of detection logic |
+| **KQL** | ⚠️ Good | Dynamic extraction from `project`, `extend`, `where`, `summarize by`, `join on` |
+| **Elastic** | ⚠️ Good | Dynamic extraction from `field:value` patterns, EQL `where` clauses |
+
+**What this means:**
+- **SPL and Sigma**: Highly accurate pattern extraction from full detection corpus
+- **KQL and Elastic**: Uses regex-based dynamic extraction that catches most patterns, but may miss:
+  - Unusual field naming conventions
+  - Complex nested expressions
+  - Custom functions or operators
+
+### Coverage Analysis Limitations
+
+- **MITRE mappings depend on source data** - If a detection doesn't have MITRE tags, we can't map it
+- **Gap analysis is relative** - "Gaps" are based on threat profiles, not absolute coverage requirements
+- **Cross-platform comparisons** - Different platforms have different capabilities; raw counts don't tell the whole story
+
+### Client Feature Availability
+
+Some v2.1 features depend on **client support**:
+
+| Feature | Requires | Fallback |
+|---------|----------|----------|
+| **Elicitation** | Client MCP elicitation support | Parameter-based confirmation (`confirm: true`) |
+| **Sampling** | Client MCP sampling support | Direct analysis without LLM enhancement |
+| **Resource Subscriptions** | Client subscription support | Poll resources manually |
+
+**Note**: As of January 2025, Cursor may not fully support elicitation and sampling. The MCP gracefully falls back to alternative methods when these features aren't available.
+
+### Reporting Issues
+
+Found a limitation or inaccuracy? Please [open an issue](https://github.com/MHaggis/Security-Detections-MCP/issues) with:
+1. The detection format (Sigma, Splunk, Elastic, KQL)
+2. An example query that wasn't extracted correctly
+3. Expected vs actual behavior
+
+We continuously improve the pattern extraction based on community feedback.
+
 ## Development
 
 ```bash
@@ -761,6 +925,12 @@ npm install
 
 # Build
 npm run build
+
+# Run tests
+npm test
+
+# Lint (TypeScript strict mode)
+npm run lint
 
 # Run with paths
 SIGMA_PATHS="./detections/sigma/rules" \
@@ -777,12 +947,112 @@ When fully indexed with all sources:
 
 | Source | Count |
 |--------|-------|
-| Sigma Rules | ~3,000+ |
+| Sigma Rules | ~3,200+ |
 | Splunk ESCU | ~2,000+ |
 | Elastic Rules | ~1,500+ |
 | KQL Queries | ~420+ |
 | Analytic Stories | ~330 |
-| **Total** | **~7,200+** |
+| **Total Detections** | **~7,200+** |
+| **Indexed Patterns** | **10,235+** |
+| **Techniques with Patterns** | **528+** |
+| **Detection Formats** | **4** (Sigma, Splunk, Elastic, KQL) |
+| **Total Tools** | **71+** |
+| **MCP Prompts** | **11** |
+| **MCP Resources** | **9 static + 5 templates** |
+
+## 🧠 Tribal Knowledge
+
+**Tribal Knowledge** is the analytical memory system that helps future agents understand WHY decisions were made, not just WHAT was detected. It's like having a senior analyst's notebook that persists across sessions.
+
+### What is Tribal Knowledge?
+
+Traditional detection systems store facts: "We have 5 detections for T1059.001." Tribal Knowledge stores reasoning: "We prioritized T1059.001 because it's used in 80% of ransomware attacks, and our current detections miss base64-encoded PowerShell, which is why we added detection X."
+
+### Knowledge Graph Tables
+
+The knowledge graph consists of four interconnected tables:
+
+1. **Entities** - Things you care about (threats, techniques, detections, data sources, campaigns)
+2. **Relations** - How entities connect ("APT29 uses T1059.001", "Detection X covers T1059.001")
+3. **Decisions** - Analytical reasoning and decision-making context
+4. **Learnings** - Insights, patterns, and lessons learned
+
+### How It Helps Future Agents
+
+When you log a decision like:
+```json
+log_decision(
+  context: "Ransomware gap analysis",
+  decision: "Prioritize T1486 (Data Encrypted for Impact)",
+  reasoning: "This is the final stage of ransomware attacks. Without detection here, we can't prevent data loss.",
+  tags: ["ransomware", "priority", "data-protection"]
+)
+```
+
+Future agents can retrieve this context when analyzing ransomware coverage, understanding not just that T1486 is important, but WHY it was prioritized.
+
+### Example Workflow
+
+```
+1. Analyze ransomware gaps → identify_gaps("ransomware")
+2. Log decision → log_decision("Prioritized T1486 because...")
+3. Create entity → create_entity("Ransomware Campaign 2024", "threat")
+4. Link detection → link_detection_to_entity("det_123", "Ransomware Campaign 2024", "detects")
+5. Future agent → get_relevant_decisions("ransomware") → understands context
+```
+
+## 🔬 Detection Engineering Intelligence
+
+**Detection Engineering Intelligence** learns patterns from your detection corpus and helps you create better detections faster.
+
+### Pattern Learning from 4 Sources
+
+The system automatically extracts patterns from:
+- **Sigma rules** - YAML-based detection logic
+- **Splunk SPL** - Search Processing Language queries
+- **KQL queries** - Microsoft Kusto Query Language
+- **Elastic queries** - Elastic Detection Rules (EQL, KQL, Lucene)
+
+### Automatic Template Generation
+
+When you need a detection for T1059.001 (PowerShell), the system:
+1. Analyzes all existing T1059.001 detections across formats
+2. Extracts common patterns (process names, command-line arguments, base64 encoding)
+3. Generates a template with placeholders for your specific environment
+4. Suggests improvements based on learned patterns
+
+### Field and Macro References
+
+The system tracks:
+- Which fields/macros are commonly used for each technique
+- Cross-platform field mappings (e.g., `process_name` in Splunk vs `ProcessName` in KQL)
+- Best practices for field usage in different contexts
+
+### Learning from User Feedback
+
+When you improve a detection or correct a pattern:
+- The system learns from your changes
+- Future template generation incorporates your improvements
+- Field suggestions become more accurate over time
+
+### Example Workflow
+
+```
+1. Extract patterns → extract_patterns("T1059.001")
+2. Review patterns → get_patterns("T1059.001", "splunk")
+3. Generate template → generate_template("T1059.001", "splunk", "Sysmon")
+4. Customize template → (edit generated detection)
+5. System learns → (automatically improves future templates)
+```
+
+## 📚 Documentation
+
+For detailed information on v2.1 features:
+
+- **[Architecture](docs/wiki/Architecture.md)** - System architecture and design decisions
+- **[Knowledge Graph](docs/wiki/Knowledge-Graph.md)** - Deep dive into tribal knowledge and knowledge graph usage
+- **[Engineering Intelligence](docs/wiki/Engineering-Intelligence.md)** - Pattern learning and template generation guide
+- **[Tools Reference](docs/wiki/Tools-Reference.md)** - Complete reference for all 71+ tools
 
 ## 🔗 Using with MITRE ATT&CK MCP
 
