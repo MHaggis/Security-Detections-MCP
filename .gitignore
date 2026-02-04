@@ -16,7 +16,7 @@ results.sqlite
 *.sqlite
 
 # Detection content (users should clone their own)
-detections/
+/detections/
 
 # IDE
 .idea/
