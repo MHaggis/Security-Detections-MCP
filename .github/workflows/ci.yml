@@ -8,10 +8,12 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [18.x, 20.x, 22.x]
 
     steps:
@@ -31,82 +33,17 @@ jobs:
         run: npm run build
 
       - name: Verify build output
-        run: |
-          test -f dist/index.js
-          test -f dist/db/connection.js
-          test -f dist/db/patterns.js
-          test -f dist/tools/engineering/index.js
-          echo "✅ All expected build outputs exist"
+        run: node -e "const fs=require('fs'); const files=['dist/index.js','dist/db/connection.js','dist/db/patterns.js','dist/tools/engineering/index.js']; let ok=true; for(const f of files){if(!fs.existsSync(f)){console.error('Missing',f);ok=false;}else{console.log('OK',f);}} if(!ok)process.exit(1); console.log('All expected build outputs exist');"
 
-  test:
-    runs-on: ubuntu-latest
+  # Cross-platform database lifecycle tests (no external data needed)
+  test-platform:
+    runs-on: ${{ matrix.os }}
     needs: build
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Initialize test database
-        run: |
-          # Create a minimal test environment
-          mkdir -p /tmp/test-detections
-          
-          # Run a quick initialization test
-          node -e "
-            import { initDb, dbExists } from './dist/db/connection.js';
-            initDb();
-            console.log('Database initialized:', dbExists());
-            process.exit(dbExists() ? 0 : 1);
-          "
-
-      - name: Run Integration Tests
-        run: node tests/integration-test.js
-        continue-on-error: true  # Tests may fail without indexed data
-
-      - name: Run Engineering Tools Tests
-        run: node tests/engineering-tools-test.js
-        continue-on-error: true  # Tests may fail without indexed data
-
-      - name: Test MCP Server Startup
-        run: |
-          timeout 5 node dist/index.js &
-          sleep 3
-          echo "✅ MCP server starts without errors"
-        continue-on-error: true
-
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: TypeScript type checking
-        run: npx tsc --noEmit
-
-  validate-schema:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -123,8 +60,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Run cross-platform database tests
+        run: node tests/cross-platform-test.js
 
       - name: Validate database schema
+        shell: bash
         run: |
           node -e "
             import { initDb, getDb } from './dist/db/connection.js';
@@ -146,5 +87,85 @@ jobs:
               }
             }
             
-            console.log('✅ All required tables exist:', required.length);
+            console.log('All required tables exist:', required.length);
           "
+
+      - name: Test MCP Server Startup (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          timeout 5 node dist/index.js &
+          sleep 3
+          echo "MCP server starts without errors"
+        continue-on-error: true
+
+      - name: Test MCP Server Startup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "node" -ArgumentList "dist/index.js" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 3
+          if (!$proc.HasExited) {
+            Stop-Process -Id $proc.Id -Force
+            Write-Host "MCP server starts without errors"
+          } else {
+            Write-Host "MCP server exited early with code $($proc.ExitCode)"
+          }
+        continue-on-error: true
+
+  # Full integration test with real Sigma data
+  test-integration:
+    runs-on: ${{ matrix.os }}
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Download Sigma rules (sparse checkout)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/SigmaHQ/sigma.git detections/sigma
+          cd detections/sigma
+          git sparse-checkout set rules rules-threat-hunting
+
+      - name: Run CI integration test (index + query + recreate cycle)
+        shell: bash
+        env:
+          SIGMA_PATHS: detections/sigma/rules,detections/sigma/rules-threat-hunting
+        run: node tests/ci-integration-test.js
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type checking
+        run: npx tsc --noEmit
