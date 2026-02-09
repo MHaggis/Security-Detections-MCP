@@ -4,6 +4,13 @@ An MCP (Model Context Protocol) server that lets LLMs query a unified database o
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInNlY3VyaXR5LWRldGVjdGlvbnMtbWNwIl0sImVudiI6eyJTSUdNQV9QQVRIUyI6Ii9wYXRoL3RvL3NpZ21hL3J1bGVzLC9wYXRoL3RvL3NpZ21hL3J1bGVzLXRocmVhdC1odW50aW5nIiwiU1BMVU5LX1BBVEhTIjoiL3BhdGgvdG8vc2VjdXJpdHlfY29udGVudC9kZXRlY3Rpb25zIiwiU1RPUllfUEFUSFMiOiIvcGF0aC90by9zZWN1cml0eV9jb250ZW50L3N0b3JpZXMiLCJFTEFTVElDX1BBVEhTIjoiL3BhdGgvdG8vZGV0ZWN0aW9uLXJ1bGVzL3J1bGVzIiwiS1FMX1BBVEhTIjoiL3BhdGgvdG8va3FsLXJ1bGVzIn19)
 
+## 🐛 Version 2.1.1 (Bug Fix)
+
+- **Fixed Windows EBUSY crash** - SQLite database recreation now handles Windows file locking with retry logic. Previously, Windows users would get `EBUSY: resource busy or locked` on startup.
+- **SQLite journal cleanup** - WAL, SHM, and journal companion files are now cleaned up during database recreation.
+- **Windows CI** - Added Windows to the CI matrix. Build, tests, and full Sigma indexing pipeline now run on both Linux and Windows.
+- **Cross-platform test suite** - New `tests/cross-platform-test.js` validates database lifecycle on all platforms. New `tests/ci-integration-test.js` downloads and indexes 3,200+ Sigma rules to validate the full pipeline.
+
 ## 🚀 Version 2.1 Features
 
 **Security Detections MCP v2.1** introduces powerful new capabilities for detection engineering intelligence, analytical memory, autonomous analysis, and advanced MCP protocol features:

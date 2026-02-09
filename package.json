@@ -1,6 +1,6 @@
 {
   "name": "security-detections-mcp",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Advanced MCP server for security detections with Detection Engineering Intelligence, Knowledge Graph (Tribal Knowledge), Elicitation, and Resource Subscriptions",
   "sigmaSpecVersion": "2.0.0",
   "type": "module",
