@@ -8,10 +8,12 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [18.x, 20.x, 22.x]
 
     steps:
@@ -31,16 +33,16 @@ jobs:
         run: npm run build
 
       - name: Verify build output
-        run: |
-          test -f dist/index.js
-          test -f dist/db/connection.js
-          test -f dist/db/patterns.js
-          test -f dist/tools/engineering/index.js
-          echo "✅ All expected build outputs exist"
+        run: node -e "const fs=require('fs'); const files=['dist/index.js','dist/db/connection.js','dist/db/patterns.js','dist/tools/engineering/index.js']; let ok=true; for(const f of files){if(!fs.existsSync(f)){console.error('Missing',f);ok=false;}else{console.log('OK',f);}} if(!ok)process.exit(1); console.log('All expected build outputs exist');"
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -58,12 +60,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run cross-platform database test
+        run: node tests/cross-platform-test.js
+
       - name: Initialize test database
+        shell: bash
         run: |
-          # Create a minimal test environment
-          mkdir -p /tmp/test-detections
-          
-          # Run a quick initialization test
           node -e "
             import { initDb, dbExists } from './dist/db/connection.js';
             initDb();
@@ -73,17 +75,33 @@ jobs:
 
       - name: Run Integration Tests
         run: node tests/integration-test.js
-        continue-on-error: true  # Tests may fail without indexed data
+        continue-on-error: true
 
       - name: Run Engineering Tools Tests
         run: node tests/engineering-tools-test.js
-        continue-on-error: true  # Tests may fail without indexed data
+        continue-on-error: true
 
-      - name: Test MCP Server Startup
+      - name: Test MCP Server Startup (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           timeout 5 node dist/index.js &
           sleep 3
-          echo "✅ MCP server starts without errors"
+          echo "MCP server starts without errors"
+        continue-on-error: true
+
+      - name: Test MCP Server Startup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "node" -ArgumentList "dist/index.js" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 3
+          if (!$proc.HasExited) {
+            Stop-Process -Id $proc.Id -Force
+            Write-Host "MCP server starts without errors"
+          } else {
+            Write-Host "MCP server exited early with code $($proc.ExitCode)"
+          }
         continue-on-error: true
 
   lint:
@@ -106,7 +124,12 @@ jobs:
         run: npx tsc --noEmit
 
   validate-schema:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -125,6 +148,7 @@ jobs:
         run: npm run build
 
       - name: Validate database schema
+        shell: bash
         run: |
           node -e "
             import { initDb, getDb } from './dist/db/connection.js';
@@ -146,5 +170,5 @@ jobs:
               }
             }
             
-            console.log('✅ All required tables exist:', required.length);
+            console.log('All required tables exist:', required.length);
           "

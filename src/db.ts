@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { homedir } from 'os';
+import { homedir, platform } from 'os';
 import { join } from 'path';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import type { Detection, IndexStats, AnalyticStory } from './types.js';
@@ -178,15 +178,45 @@ export function clearDb(): void {
   database.exec('DELETE FROM detections');
 }
 
+// Safely delete a file with retry logic for Windows (EBUSY/EPERM)
+function safeUnlink(filePath: string, maxRetries = 5, delayMs = 100): void {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+      return;
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') && attempt < maxRetries - 1) {
+        const end = Date.now() + delayMs * (attempt + 1);
+        while (Date.now() < end) { /* wait */ }
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 // Force recreation of the database (needed when schema changes)
+// Handles Windows file locking with retry logic
 export function recreateDb(): void {
   if (db) {
     db.close();
     db = null;
   }
-  if (existsSync(DB_PATH)) {
-    unlinkSync(DB_PATH);
+
+  // Small delay on Windows to let file handles fully release
+  if (platform() === 'win32') {
+    const end = Date.now() + 100;
+    while (Date.now() < end) { /* wait */ }
   }
+
+  // Delete main db and SQLite journal/WAL files
+  safeUnlink(DB_PATH);
+  safeUnlink(DB_PATH + '-wal');
+  safeUnlink(DB_PATH + '-shm');
+  safeUnlink(DB_PATH + '-journal');
 }
 
 export function insertDetection(detection: Detection): void {
