@@ -1,0 +1,23 @@
+services:
+  security-detections-mcp:
+    build: .
+    container_name: security-detections-mcp
+    volumes:
+      # Mount your local detection repos into the container
+      # Adjust the left-hand paths to wherever you cloned them on your host
+      - ./detections/sigma:/detections/sigma:ro
+      - ./detections/security_content:/detections/security_content:ro
+      - ./detections/detection-rules:/detections/detection-rules:ro
+      # Persist the SQLite index between restarts
+      - mcp-cache:/root/.cache/security-detections-mcp
+    environment:
+      SIGMA_PATHS: /detections/sigma/rules,/detections/sigma/rules-threat-hunting
+      SPLUNK_PATHS: /detections/security_content/detections
+      ELASTIC_PATHS: /detections/detection-rules/rules
+      STORY_PATHS: /detections/security_content/stories
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  mcp-cache:
