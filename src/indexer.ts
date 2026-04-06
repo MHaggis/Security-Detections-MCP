@@ -5,6 +5,7 @@ import { parseSplunkFile } from './parsers/splunk.js';
 import { parseStoryFile } from './parsers/story.js';
 import { parseElasticFile } from './parsers/elastic.js';
 import { parseKqlFile, parseRawKqlFile } from './parsers/kql.js';
+import { parseSublimeFile } from './parsers/sublime.js';
 import { recreateDb, insertDetection, insertStory, getDetectionCount, initDb } from './db.js';
 
 // Recursively find all YAML files in a directory
@@ -133,22 +134,25 @@ export interface IndexResult {
   elastic_failed: number;
   kql_indexed: number;
   kql_failed: number;
+  sublime_indexed: number;
+  sublime_failed: number;
   stories_indexed: number;
   stories_failed: number;
   total: number;
 }
 
 export function indexDetections(
-  sigmaPaths: string[], 
+  sigmaPaths: string[],
   splunkPaths: string[],
   storyPaths: string[] = [],
   elasticPaths: string[] = [],
-  kqlPaths: string[] = []
+  kqlPaths: string[] = [],
+  sublimePaths: string[] = []
 ): IndexResult {
   // Recreate DB to ensure schema is up to date
   recreateDb();
   initDb();
-  
+
   let sigma_indexed = 0;
   let sigma_failed = 0;
   let splunk_indexed = 0;
@@ -157,6 +161,8 @@ export function indexDetections(
   let elastic_failed = 0;
   let kql_indexed = 0;
   let kql_failed = 0;
+  let sublime_indexed = 0;
+  let sublime_failed = 0;
   let stories_indexed = 0;
   let stories_failed = 0;
   
@@ -232,6 +238,21 @@ export function indexDetections(
     }
   }
   
+  // Index Sublime Security rules (YAML with MQL source)
+  for (const basePath of sublimePaths) {
+    const files = findYamlFiles(basePath);
+
+    for (const file of files) {
+      const detection = parseSublimeFile(file);
+      if (detection) {
+        insertDetection(detection);
+        sublime_indexed++;
+      } else {
+        sublime_failed++;
+      }
+    }
+  }
+
   // Index Splunk Analytic Stories (optional)
   for (const basePath of storyPaths) {
     const files = findYamlFiles(basePath);
@@ -256,9 +277,11 @@ export function indexDetections(
     elastic_failed,
     kql_indexed,
     kql_failed,
+    sublime_indexed,
+    sublime_failed,
     stories_indexed,
     stories_failed,
-    total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed,
+    total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed + sublime_indexed,
   };
 }
 
