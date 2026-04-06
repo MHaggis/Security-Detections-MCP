@@ -391,8 +391,11 @@ export function parseRawKqlFile(filePath: string, basePath: string): Detection |
       kql_category: category,
       kql_tags: tags,
       kql_keywords: keywords,
+      sublime_attack_types: [],
+      sublime_detection_methods: [],
+      sublime_tactics: [],
     };
-    
+
     return detection;
   } catch {
     return null;
@@ -473,8 +476,11 @@ export function parseKqlFile(filePath: string, basePath: string): Detection | nu
       kql_category: category,
       kql_tags: tags,
       kql_keywords: keywords,
+      sublime_attack_types: [],
+      sublime_detection_methods: [],
+      sublime_tactics: [],
     };
-    
+
     return detection;
   } catch {
     return null;

@@ -208,8 +208,11 @@ export function parseSplunkFile(filePath: string): Detection | null {
       kql_category: null,
       kql_tags: [],
       kql_keywords: [],
+      sublime_attack_types: [],
+      sublime_detection_methods: [],
+      sublime_tactics: [],
     };
-    
+
     return detection;
   } catch (err) {
     // Skip files that can't be parsed

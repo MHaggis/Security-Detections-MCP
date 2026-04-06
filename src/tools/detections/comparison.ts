@@ -26,7 +26,7 @@ export const comparisonTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Optional: filter by source type',
         },
         limit: {
@@ -38,7 +38,7 @@ export const comparisonTools = [
     },
     handler: async (args) => {
       const query = args.query as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
       const limit = (args.limit as number) || 100;
 
       if (!query) {
@@ -174,7 +174,7 @@ export const comparisonTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Optional: filter to specific source',
         },
       },
@@ -182,7 +182,7 @@ export const comparisonTools = [
     },
     handler: async (args) => {
       const pattern = args.pattern as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
 
       if (!pattern) {
         return {
@@ -272,13 +272,13 @@ export const comparisonTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter by source type (optional)',
         },
       },
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
       const report = analyzeCoverage(sourceType);
 
       // Return minimal data - just percentages

@@ -33,7 +33,7 @@ export const analysisTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter by source type',
         },
         tactic: {
@@ -54,7 +54,7 @@ export const analysisTools = [
       },
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
       const tactic = args.tactic as string | undefined;
       const severity = args.severity as string | undefined;
 
@@ -79,13 +79,13 @@ export const analysisTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter by source type (optional - analyzes all if not specified)',
         },
       },
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
       const report = analyzeCoverage(sourceType);
       return report;
     },
@@ -104,7 +104,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter by source type (optional)',
         },
       },
@@ -112,7 +112,7 @@ export const analysisTools = [
     },
     handler: async (args) => {
       const threatProfile = args.threat_profile as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
 
       if (!threatProfile) {
         return {
@@ -141,7 +141,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter by source type (optional)',
         },
       },
@@ -149,7 +149,7 @@ export const analysisTools = [
     },
     handler: async (args) => {
       const techniqueId = args.technique_id as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | undefined;
 
       if (!techniqueId) {
         return {

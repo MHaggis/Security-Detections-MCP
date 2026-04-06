@@ -29,7 +29,7 @@ export const searchTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime'],
           description: 'Filter results by detection source type',
         },
       },
