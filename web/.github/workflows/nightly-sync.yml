@@ -1,0 +1,100 @@
+name: Nightly Detection Sync
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install MCP server dependencies
+        run: npm ci
+
+      - name: Clone detection repos
+        run: |
+          mkdir -p /tmp/repos
+
+          # Sigma rules
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/SigmaHQ/sigma.git /tmp/repos/sigma
+          cd /tmp/repos/sigma && git sparse-checkout set rules rules-threat-hunting && cd -
+
+          # Splunk ESCU
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/splunk/security_content.git /tmp/repos/splunk
+          cd /tmp/repos/splunk && git sparse-checkout set detections stories && cd -
+
+          # Elastic
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/elastic/detection-rules.git /tmp/repos/elastic
+          cd /tmp/repos/elastic && git sparse-checkout set rules && cd -
+
+          # KQL hunting queries (multiple repos)
+          git clone --depth 1 https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules.git /tmp/repos/kql-bertjanp
+          git clone --depth 1 https://github.com/jkerai1/KQL-Queries.git /tmp/repos/kql-jkerai1
+
+          # Sublime Security
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/sublime-security/sublime-rules.git /tmp/repos/sublime
+          cd /tmp/repos/sublime && git sparse-checkout set detection-rules && cd -
+
+          # CrowdStrike CQL Hub
+          git clone --depth 1 https://github.com/ByteRay-Labs/Query-Hub.git /tmp/repos/cql-hub
+
+          # MITRE ATT&CK STIX data
+          git clone --depth 1 https://github.com/mitre-attack/attack-stix-data.git /tmp/repos/stix
+
+      - name: Build MCP server
+        run: npm run build
+
+      - name: Index all sources (builds SQLite DB)
+        run: npm start 2>&1 &
+        env:
+          SIGMA_PATHS: /tmp/repos/sigma/rules,/tmp/repos/sigma/rules-threat-hunting
+          SPLUNK_PATHS: /tmp/repos/splunk/detections
+          STORY_PATHS: /tmp/repos/splunk/stories
+          ELASTIC_PATHS: /tmp/repos/elastic/rules
+          KQL_PATHS: /tmp/repos/kql-bertjanp,/tmp/repos/kql-jkerai1
+          SUBLIME_PATHS: /tmp/repos/sublime/detection-rules
+          CQL_HUB_PATHS: /tmp/repos/cql-hub/queries
+          ATTACK_STIX_PATH: /tmp/repos/stix/enterprise-attack/enterprise-attack.json
+
+      - name: Wait for MCP server to finish indexing
+        run: |
+          # The MCP server indexes on startup, then waits for stdio.
+          # Wait for the SQLite DB to appear and stabilize.
+          DB_PATH="$HOME/.cache/security-detections-mcp/detections.sqlite"
+          echo "Waiting for SQLite DB at $DB_PATH..."
+          for i in $(seq 1 120); do
+            if [ -f "$DB_PATH" ]; then
+              # Wait for file size to stabilize (indexing done)
+              SIZE1=$(stat -c%s "$DB_PATH" 2>/dev/null || echo 0)
+              sleep 5
+              SIZE2=$(stat -c%s "$DB_PATH" 2>/dev/null || echo 0)
+              if [ "$SIZE1" = "$SIZE2" ] && [ "$SIZE1" -gt 1000000 ]; then
+                echo "SQLite DB ready: $(du -h "$DB_PATH")"
+                break
+              fi
+            fi
+            sleep 5
+          done
+          # Kill the MCP server
+          pkill -f "node.*dist" || true
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      - name: Seed Supabase from SQLite
+        run: cd web && npx tsx scripts/seed-from-sqlite.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# debug
+npm-debug.log*
+
+# vercel
+.vercel
+
+# admin queries (contains sensitive SQL for tier/role changes)
+supabase/admin-queries.sql
+
+# email templates (configured in Supabase dashboard, contain branding)
+supabase/email-templates/
+
+# supabase CLI temp files
+supabase/.temp/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

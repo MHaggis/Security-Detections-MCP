@@ -107,8 +107,8 @@ function extractMitreTactics(mitreIds: string[]): string[] {
 function extractKqlQueries(content: string): string[] {
   const queries: string[] = [];
   
-  // Match ```KQL or ```kql blocks
-  const kqlBlocks = content.matchAll(/```(?:KQL|kql)\s*\n([\s\S]*?)```/gi);
+  // Match ```KQL, ```kql, ```Kusto, or ```kusto blocks
+  const kqlBlocks = content.matchAll(/```(?:KQL|kql|Kusto|kusto)\s*\n([\s\S]*?)```/gi);
   for (const match of kqlBlocks) {
     const query = match[1].trim();
     if (query.length > 0) {
