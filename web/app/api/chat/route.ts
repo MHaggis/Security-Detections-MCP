@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
       // For data-heavy queries, build the response with REAL DATA first,
       // then ask the AI only for analysis/recommendations
-      const { dataReport } = await buildDataDrivenResponse(lastUserMsg);
+      const { dataReport } = await buildDataDrivenResponse(lastUserMsg, user.id);
 
       if (dataReport) {
         // We have structured data — ask AI for brief analysis only
@@ -411,7 +411,7 @@ function cleanDescription(desc: string | null | undefined, maxLen = 300): string
 }
 
 // Build structured data reports directly from DB — no AI hallucination possible
-async function buildDataDrivenResponse(userMessage: string): Promise<{ dataReport: string | null }> {
+async function buildDataDrivenResponse(userMessage: string, userId?: string): Promise<{ dataReport: string | null }> {
   const { createClient } = await import('@supabase/supabase-js');
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const msg = userMessage.toLowerCase();
@@ -491,12 +491,12 @@ async function buildDataDrivenResponse(userMessage: string): Promise<{ dataRepor
       let report = `## Threat Report Analysis\n\n`;
       report += `**Source:** [${title}](${url})\n\n`;
 
+      // Query coverage for all techniques
+      const techniqueData: Record<string, {name: string; detections: number; sources: string[]}> = {};
+
       // MITRE Techniques found
       if (techniques.length > 0) {
         report += `### MITRE ATT&CK Techniques Found (${techniques.length})\n\n`;
-
-        // Query coverage for all techniques at once
-        const techniqueData: Record<string, {name: string; detections: number; sources: string[]}> = {};
         for (const tid of techniques.slice(0, 20)) {
           const { data: techIntel } = await sb.rpc('get_technique_intelligence', { p_technique_id: tid });
           if (techIntel) {
@@ -550,6 +550,47 @@ async function buildDataDrivenResponse(userMessage: string): Promise<{ dataRepor
         if (hashes.length > 0) report += `**Hashes:** ${hashes.slice(0, 10).join(', ')}\n`;
         report += '\n*Note: IOC-based detection is complementary to behavioral/TTP-based detection above.*\n';
       }
+
+      // Auto-save to threat_reports so it appears in /reports
+      if (userId) {
+        try {
+          const coveredTechs = Object.entries(techniqueData).filter(([, d]) => d.detections > 0);
+          const gapTechs = Object.entries(techniqueData).filter(([, d]) => d.detections === 0);
+          const coveragePctVal = techniques.length > 0 ? Math.round((coveredTechs.length / techniques.length) * 100) : 0;
+
+          await sb.from('threat_reports').insert({
+            user_id: userId,
+            title: title,
+            content: text.substring(0, 100000),
+            source_url: url,
+            status: 'complete',
+            is_public: false,
+            extracted_techniques: techniques.map((tid: string) => ({
+              id: tid,
+              name: techniqueData[tid]?.name || 'Unknown',
+              covered: (techniqueData[tid]?.detections || 0) > 0,
+              detection_count: techniqueData[tid]?.detections || 0,
+              sources: techniqueData[tid]?.sources || [],
+            })),
+            extracted_actors: [],
+            extracted_iocs: { ips, hashes, domains: [], cves },
+            analysis_result: {
+              summary: `Auto-analyzed from chat. ${techniques.length} techniques found, ${coveragePctVal}% coverage.`,
+              total_techniques: techniques.length,
+              covered_count: coveredTechs.length,
+              gap_count: gapTechs.length,
+              coverage_pct: coveragePctVal,
+              gap_techniques: gapTechs.map(([t]) => ({ id: t, name: techniqueData[t]?.name || 'Unknown' })),
+              covered_techniques: coveredTechs.map(([t, d]) => ({ id: t, name: d.name, detection_count: d.detections, sources: d.sources })),
+              cve_detections: cves.map((c: string) => ({ cve: c, detection_count: 0 })),
+            },
+          });
+        } catch (saveErr) {
+          console.error('Failed to auto-save report from chat:', saveErr);
+        }
+      }
+
+      report += `\n---\n*This analysis has been saved to your [Reports](/reports).*\n`;
 
       return { dataReport: report };
     } catch (err) {

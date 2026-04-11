@@ -13,6 +13,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '&#9638;' },
   { href: '/explore', label: 'Explore', icon: '&#128269;' },
   { href: '/coverage', label: 'Coverage', icon: '&#128200;' },
+  { href: '/reports', label: 'Reports', icon: '&#128196;' },
   { href: '/chat', label: 'Chat', icon: '&#128172;' },
   { href: '/explore/actor', label: 'Actors', icon: '&#128123;' },
   { href: '/coverage/compare', label: 'Compare', icon: '&#8644;' },
