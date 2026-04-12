@@ -3,8 +3,64 @@
 An MCP (Model Context Protocol) server that lets LLMs query a unified database of **Sigma**, **Splunk ESCU**, **Elastic**, **KQL**, **Sublime**, and **CrowdStrike CQL** security detection rules.
 
 > **New here? Start with the [Setup Guide](./SETUP.md)** -- covers macOS, Windows (WSL & native), and Linux step by step.
+>
+> **Want it hosted? Skip the install entirely: [Hosted MCP Setup Guide](./docs/HOSTED_MCP.md)**
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInNlY3VyaXR5LWRldGVjdGlvbnMtbWNwIl0sImVudiI6eyJTSUdNQV9QQVRIUyI6Ii9wYXRoL3RvL3NpZ21hL3J1bGVzLC9wYXRoL3RvL3NpZ21hL3J1bGVzLXRocmVhdC1odW50aW5nIiwiU1BMVU5LX1BBVEhTIjoiL3BhdGgvdG8vc2VjdXJpdHlfY29udGVudC9kZXRlY3Rpb25zIiwiU1RPUllfUEFUSFMiOiIvcGF0aC90by9zZWN1cml0eV9jb250ZW50L3N0b3JpZXMiLCJFTEFTVElDX1BBVEhTIjoiL3BhdGgvdG8vZGV0ZWN0aW9uLXJ1bGVzL3J1bGVzIiwiS1FMX1BBVEhTIjoiL3BhdGgvdG8va3FsLXJ1bGVzIiwiU1VCTElNRV9QQVRIUyI6Ii9wYXRoL3RvL3N1YmxpbWUtcnVsZXMvZGV0ZWN0aW9uLXJ1bGVzIiwiQ1FMX0hVQl9QQVRIUyI6Ii9wYXRoL3RvL2NxbC1odWIvcXVlcmllcyJ9fQ==)
+## Two Ways to Run It
+
+**Local (full power)** — the npm package you're looking at. Runs on your machine, indexes your own detection repos, exposes all 81 tools. You need Node.js and ~10 minutes.
+
+**Hosted (zero setup)** — a Streamable HTTP server at [`detect.michaelhaag.org/api/mcp/http`](https://detect.michaelhaag.org/mcp). Sign up, generate a token, paste one URL into your MCP client. ~25 read-only tools, always in sync with the latest content, 200 calls/day free. Read on for quick-install buttons.
+
+### Install — Local (Cursor)
+
+[![Install Local MCP in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInNlY3VyaXR5LWRldGVjdGlvbnMtbWNwIl0sImVudiI6eyJTSUdNQV9QQVRIUyI6Ii9wYXRoL3RvL3NpZ21hL3J1bGVzLC9wYXRoL3RvL3NpZ21hL3J1bGVzLXRocmVhdC1odW50aW5nIiwiU1BMVU5LX1BBVEhTIjoiL3BhdGgvdG8vc2VjdXJpdHlfY29udGVudC9kZXRlY3Rpb25zIiwiU1RPUllfUEFUSFMiOiIvcGF0aC90by9zZWN1cml0eV9jb250ZW50L3N0b3JpZXMiLCJFTEFTVElDX1BBVEhTIjoiL3BhdGgvdG8vZGV0ZWN0aW9uLXJ1bGVzL3J1bGVzIiwiS1FMX1BBVEhTIjoiL3BhdGgvdG8va3FsLXJ1bGVzIiwiU1VCTElNRV9QQVRIUyI6Ii9wYXRoL3RvL3N1YmxpbWUtcnVsZXMvZGV0ZWN0aW9uLXJ1bGVzIiwiQ1FMX0hVQl9QQVRIUyI6Ii9wYXRoL3RvL2NxbC1odWIvcXVlcmllcyJ9fQ==)
+
+### Install — Hosted (no setup, token required)
+
+1. **Create a token** at [detect.michaelhaag.org/account/tokens](https://detect.michaelhaag.org/account/tokens). Free tier: 200 calls/day, all read-only tools.
+2. **Click the button for your client** — replace `sdmcp_YOUR_TOKEN_HERE` in the resulting config with the token you just generated.
+
+[![Install Hosted MCP in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=security-detections-hosted&config=eyJ1cmwiOiJodHRwczovL2RldGVjdC5taWNoYWVsaGFhZy5vcmcvYXBpL21jcC9odHRwIiwiaGVhZGVycyI6eyJBdXRob3JpemF0aW9uIjoiQmVhcmVyIHNkbWNwX1lPVVJfVE9LRU5fSEVSRSJ9fQ==)
+[![Install Hosted MCP in VS Code](https://img.shields.io/badge/VS_Code-Install_Hosted_MCP-0078d4?style=for-the-badge&logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fhttp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)
+[![Install Hosted MCP in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Hosted_MCP-24bfa5?style=for-the-badge&logo=visualstudiocode&logoColor=white)](vscode-insiders:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fhttp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)
+
+**Claude Code** (CLI one-liner):
+
+```bash
+claude mcp add --transport http security-detections \
+  https://detect.michaelhaag.org/api/mcp/http \
+  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+```
+
+**Claude Desktop** (via [`mcp-remote`](https://github.com/geelen/mcp-remote) — Desktop doesn't speak remote HTTP natively yet):
+
+```json
+{
+  "mcpServers": {
+    "security-detections": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://detect.michaelhaag.org/api/mcp/http",
+        "--header",
+        "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+      ]
+    }
+  }
+}
+```
+
+**OpenAI Codex** (CLI):
+
+```bash
+codex mcp add security-detections \
+  --transport http https://detect.michaelhaag.org/api/mcp/http \
+  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+```
+
+See the [Hosted MCP Setup Guide](./docs/HOSTED_MCP.md) for the full table of clients, the complete tool inventory, and troubleshooting tips.
 
 ## What's New in 3.2
 

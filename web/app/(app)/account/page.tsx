@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { AccountForm } from './account-form';
 
 export default async function AccountPage() {
@@ -83,6 +84,24 @@ export default async function AccountPage() {
             </a>
           </div>
         )}
+      </div>
+
+      {/* Hosted MCP Tokens */}
+      <div className="bg-card border border-border rounded-[var(--radius-card)] p-6 mb-6">
+        <h2 className="font-[family-name:var(--font-display)] text-xl text-text-bright tracking-wider mb-2">
+          HOSTED MCP TOKENS
+        </h2>
+        <p className="text-text-dim text-sm mb-4">
+          Generate a token to connect your AI assistant (Claude Desktop, Cursor, Claude Code) directly to{' '}
+          <code className="text-amber font-[family-name:var(--font-mono)]">detect.michaelhaag.org/api/mcp/http</code>.
+          No install required.
+        </p>
+        <Link
+          href="/account/tokens"
+          className="inline-block bg-card2 hover:bg-card border border-border-bright text-text-bright font-semibold px-6 py-2 rounded-[var(--radius-button)] transition-colors"
+        >
+          Manage Tokens &rarr;
+        </Link>
       </div>
 
       {/* API Keys */}
