@@ -2,6 +2,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { TokensManager } from './tokens-manager';
+import { CopyBlock } from './copy-block';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,14 +113,14 @@ export default async function TokensPage() {
 
         <div className="mb-5">
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">Claude Code (CLI)</div>
-          <pre className="bg-bg2 border border-border rounded p-3 overflow-x-auto text-xs font-[family-name:var(--font-mono)] text-text">{`claude mcp add --transport http security-detections https://detect.michaelhaag.org/api/mcp/http --header "Authorization: Bearer sdmcp_..."`}</pre>
+          <CopyBlock>{`claude mcp add --transport http security-detections https://detect.michaelhaag.org/api/mcp/http --header "Authorization: Bearer sdmcp_..."`}</CopyBlock>
         </div>
 
         <div className="mb-5">
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">
             Claude Desktop (via mcp-remote)
           </div>
-          <pre className="bg-bg2 border border-border rounded p-3 overflow-x-auto text-xs font-[family-name:var(--font-mono)] text-text">{`{
+          <CopyBlock>{`{
   "mcpServers": {
     "security-detections": {
       "command": "npx",
@@ -128,17 +129,17 @@ export default async function TokensPage() {
         "--header", "Authorization: Bearer sdmcp_..."]
     }
   }
-}`}</pre>
+}`}</CopyBlock>
         </div>
 
         <div className="mb-5">
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">OpenAI Codex (CLI)</div>
-          <pre className="bg-bg2 border border-border rounded p-3 overflow-x-auto text-xs font-[family-name:var(--font-mono)] text-text">{`codex mcp add security-detections --transport http https://detect.michaelhaag.org/api/mcp/http --header "Authorization: Bearer sdmcp_..."`}</pre>
+          <CopyBlock>{`codex mcp add security-detections --transport http https://detect.michaelhaag.org/api/mcp/http --header "Authorization: Bearer sdmcp_..."`}</CopyBlock>
         </div>
 
         <div>
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">Test with curl</div>
-          <pre className="bg-bg2 border border-border rounded p-3 overflow-x-auto text-xs font-[family-name:var(--font-mono)] text-text">{`curl -X POST https://detect.michaelhaag.org/api/mcp/http -H "Authorization: Bearer sdmcp_..." -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</pre>
+          <CopyBlock>{`curl -X POST https://detect.michaelhaag.org/api/mcp/http -H "Authorization: Bearer sdmcp_..." -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</CopyBlock>
         </div>
       </div>
     </div>
