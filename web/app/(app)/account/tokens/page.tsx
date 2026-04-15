@@ -3,6 +3,13 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { TokensManager } from './tokens-manager';
 import { CopyBlock } from './copy-block';
+import {
+  HOSTED_CODEX_TOKEN_ENV_VAR,
+  HOSTED_CURSOR_INSTALL_URL,
+  HOSTED_MCP_URL,
+  HOSTED_TOKEN_PLACEHOLDER,
+  HOSTED_VSCODE_INSTALL_URL,
+} from '@/lib/mcp/install-links';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +68,7 @@ export default async function TokensPage() {
       <p className="text-text-dim text-sm mb-8">
         Generate tokens to connect your AI client to the hosted Security Detections MCP at{' '}
         <code className="bg-bg2 px-2 py-0.5 rounded font-[family-name:var(--font-mono)] text-amber">
-          detect.michaelhaag.org/api/mcp/mcp
+          {HOSTED_MCP_URL.replace(/^https?:\/\//, '')}
         </code>
       </p>
 
@@ -101,7 +108,7 @@ export default async function TokensPage() {
         {/* One-click install buttons */}
         <div className="grid grid-cols-2 gap-2 mb-5">
           <a
-            href="https://cursor.com/en/install-mcp?name=security-detections-hosted&config=eyJ1cmwiOiJodHRwczovL2RldGVjdC5taWNoYWVsaGFhZy5vcmcvYXBpL21jcC9tY3AiLCJoZWFkZXJzIjp7IkF1dGhvcml6YXRpb24iOiJCZWFyZXIgc2RtY3BfWU9VUl9UT0tFTl9IRVJFIn19"
+            href={HOSTED_CURSOR_INSTALL_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between bg-bg2 hover:bg-card2 border border-border hover:border-amber/50 rounded px-3 py-2 transition-colors"
@@ -110,7 +117,9 @@ export default async function TokensPage() {
             <span className="text-amber text-xs">&rarr;</span>
           </a>
           <a
-            href="vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D"
+            href={HOSTED_VSCODE_INSTALL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center justify-between bg-bg2 hover:bg-card2 border border-border hover:border-amber/50 rounded px-3 py-2 transition-colors"
           >
             <span className="text-text-bright font-bold text-xs">Install in VS Code</span>
@@ -120,7 +129,7 @@ export default async function TokensPage() {
 
         <div className="mb-5">
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">Claude Code (CLI)</div>
-          <CopyBlock>{`claude mcp add --transport http security-detections https://detect.michaelhaag.org/api/mcp/mcp --header "Authorization: Bearer sdmcp_..."`}</CopyBlock>
+          <CopyBlock>{`claude mcp add --transport http security-detections ${HOSTED_MCP_URL} --header "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}"`}</CopyBlock>
         </div>
 
         <div className="mb-5">
@@ -132,8 +141,8 @@ export default async function TokensPage() {
     "security-detections": {
       "command": "npx",
       "args": ["-y", "mcp-remote",
-        "https://detect.michaelhaag.org/api/mcp/mcp",
-        "--header", "Authorization: Bearer sdmcp_..."]
+        "${HOSTED_MCP_URL}",
+        "--header", "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}"]
     }
   }
 }`}</CopyBlock>
@@ -141,12 +150,15 @@ export default async function TokensPage() {
 
         <div className="mb-5">
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">OpenAI Codex (CLI)</div>
-          <CopyBlock>{`codex mcp add security-detections --transport http https://detect.michaelhaag.org/api/mcp/mcp --header "Authorization: Bearer sdmcp_..."`}</CopyBlock>
+          <CopyBlock>{`export ${HOSTED_CODEX_TOKEN_ENV_VAR}="${HOSTED_TOKEN_PLACEHOLDER}" && codex mcp add security-detections --url ${HOSTED_MCP_URL} --bearer-token-env-var ${HOSTED_CODEX_TOKEN_ENV_VAR}`}</CopyBlock>
+          <p className="text-text-dim text-xs mt-2">
+            Keep <code className="text-amber">{HOSTED_CODEX_TOKEN_ENV_VAR}</code> set in your shell profile so Codex can use the token in new sessions.
+          </p>
         </div>
 
         <div>
           <div className="text-amber font-[family-name:var(--font-mono)] text-xs font-bold mb-2">Test with curl</div>
-          <CopyBlock>{`curl -X POST https://detect.michaelhaag.org/api/mcp/mcp -H "Authorization: Bearer sdmcp_..." -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</CopyBlock>
+          <CopyBlock>{`curl -X POST ${HOSTED_MCP_URL} -H "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}" -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</CopyBlock>
         </div>
       </div>
     </div>

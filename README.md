@@ -57,9 +57,7 @@ codex mcp add security-detections -- npx -y security-detections-mcp
 **Claude Code** (CLI one-liner):
 
 ```bash
-claude mcp add --transport http security-detections \
-  https://detect.michaelhaag.org/api/mcp/mcp \
-  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+claude mcp add --transport http security-detections https://detect.michaelhaag.org/api/mcp/mcp --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
 ```
 
 **Claude Desktop** (via [`mcp-remote`](https://github.com/geelen/mcp-remote) — Desktop doesn't speak remote HTTP natively yet):
@@ -84,10 +82,7 @@ claude mcp add --transport http security-detections \
 **OpenAI Codex** (CLI):
 
 ```bash
-# Set your token as an env var first: export SDMCP_TOKEN="sdmcp_YOUR_TOKEN_HERE"
-codex mcp add security-detections \
-  --url https://detect.michaelhaag.org/api/mcp/mcp \
-  --bearer-token-env-var SDMCP_TOKEN
+export SDMCP_TOKEN="sdmcp_YOUR_TOKEN_HERE" && codex mcp add security-detections --url https://detect.michaelhaag.org/api/mcp/mcp --bearer-token-env-var SDMCP_TOKEN
 ```
 
 See the [Hosted MCP Setup Guide](./docs/HOSTED_MCP.md) for the full table of clients, the complete tool inventory, and troubleshooting tips.

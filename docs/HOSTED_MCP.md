@@ -79,8 +79,8 @@ After clicking, edit the installed server in **Cursor → Settings → MCP** and
 
 One-click install (opens VS Code):
 
-- **[Install in VS Code →](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
-- **[Install in VS Code Insiders →](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
+- **[Install in VS Code →](https://vscode.dev/redirect?url=vscode:mcp/install?name=security-detections&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fmcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
+- **[Install in VS Code Insiders →](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?name=security-detections&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fmcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
 
 After clicking, edit the installed server in VS Code and replace the placeholder token. Or edit your MCP config directly:
 
@@ -101,9 +101,7 @@ After clicking, edit the installed server in VS Code and replace the placeholder
 ### Claude Code CLI
 
 ```bash
-claude mcp add --transport http security-detections \
-  https://detect.michaelhaag.org/api/mcp/mcp \
-  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+claude mcp add --transport http security-detections https://detect.michaelhaag.org/api/mcp/mcp --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
 ```
 
 Verify with `claude mcp list`, then start Claude Code — the tools will be available. `.mcp.json` equivalent:
@@ -156,18 +154,17 @@ Codex CLI and IDE extension support Streamable HTTP remote servers natively.
 **CLI one-liner:**
 
 ```bash
-codex mcp add security-detections \
-  --transport http https://detect.michaelhaag.org/api/mcp/mcp \
-  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+export SDMCP_TOKEN="sdmcp_YOUR_TOKEN_HERE" && codex mcp add security-detections --url https://detect.michaelhaag.org/api/mcp/mcp --bearer-token-env-var SDMCP_TOKEN
 ```
+
+Set `SDMCP_TOKEN` in your shell profile so Codex can read it in future sessions.
 
 **Config file** — `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.security-detections]
-type = "http"
 url = "https://detect.michaelhaag.org/api/mcp/mcp"
-headers = { Authorization = "Bearer sdmcp_YOUR_TOKEN_HERE" }
+bearer_token_env_var = "SDMCP_TOKEN"
 ```
 
 ### Any other MCP client

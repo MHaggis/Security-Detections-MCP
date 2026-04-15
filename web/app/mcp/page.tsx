@@ -1,4 +1,12 @@
 import Link from 'next/link';
+import {
+  HOSTED_CODEX_TOKEN_ENV_VAR,
+  HOSTED_CURSOR_INSTALL_URL,
+  HOSTED_MCP_URL,
+  HOSTED_TOKEN_PLACEHOLDER,
+  HOSTED_VSCODE_INSIDERS_INSTALL_URL,
+  HOSTED_VSCODE_INSTALL_URL,
+} from '@/lib/mcp/install-links';
 
 function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -160,7 +168,7 @@ export default function McpSetupPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                 {/* Cursor */}
                 <a
-                  href="https://cursor.com/en/install-mcp?name=security-detections-hosted&config=eyJ1cmwiOiJodHRwczovL2RldGVjdC5taWNoYWVsaGFhZy5vcmcvYXBpL21jcC9tY3AiLCJoZWFkZXJzIjp7IkF1dGhvcml6YXRpb24iOiJCZWFyZXIgc2RtY3BfWU9VUl9UT0tFTl9IRVJFIn19"
+                  href={HOSTED_CURSOR_INSTALL_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between gap-3 bg-card hover:bg-card2 border border-border-bright hover:border-amber/50 rounded-[var(--radius-button)] px-4 py-3 transition-colors"
@@ -174,7 +182,9 @@ export default function McpSetupPage() {
 
                 {/* VS Code */}
                 <a
-                  href="vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fmcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D"
+                  href={HOSTED_VSCODE_INSTALL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-between gap-3 bg-card hover:bg-card2 border border-border-bright hover:border-amber/50 rounded-[var(--radius-button)] px-4 py-3 transition-colors"
                 >
                   <div>
@@ -186,7 +196,9 @@ export default function McpSetupPage() {
 
                 {/* VS Code Insiders */}
                 <a
-                  href="vscode-insiders:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fdetect.michaelhaag.org%2Fapi%2Fmcp%2Fmcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D"
+                  href={HOSTED_VSCODE_INSIDERS_INSTALL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-between gap-3 bg-card hover:bg-card2 border border-border hover:border-amber/50 rounded-[var(--radius-button)] px-4 py-3 transition-colors"
                 >
                   <div>
@@ -212,9 +224,7 @@ export default function McpSetupPage() {
               {/* Claude Code CLI */}
               <div className="mt-6">
                 <div className="text-green font-[family-name:var(--font-mono)] text-sm font-bold mb-2">Claude Code (CLI one-liner)</div>
-                <CodeBlock title="Terminal" lang="bash">{`claude mcp add --transport http security-detections \\
-  https://detect.michaelhaag.org/api/mcp/mcp \\
-  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"`}</CodeBlock>
+                <CodeBlock title="Terminal" lang="bash">{`claude mcp add --transport http security-detections ${HOSTED_MCP_URL} --header "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}"`}</CodeBlock>
               </div>
 
               {/* Claude Desktop via mcp-remote */}
@@ -230,9 +240,9 @@ export default function McpSetupPage() {
       "args": [
         "-y",
         "mcp-remote",
-        "https://detect.michaelhaag.org/api/mcp/mcp",
+        "${HOSTED_MCP_URL}",
         "--header",
-        "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"
+        "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}"
       ]
     }
   }
@@ -241,27 +251,23 @@ export default function McpSetupPage() {
 
               {/* OpenAI Codex */}
               <div className="mt-4">
-                <div className="text-green font-[family-name:var(--font-mono)] text-sm font-bold mb-2">OpenAI Codex</div>
-                <CodeBlock title="Terminal" lang="bash">{`codex mcp add security-detections \\
-  --transport http https://detect.michaelhaag.org/api/mcp/mcp \\
-  --header "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE"`}</CodeBlock>
+                <div className="text-green font-[family-name:var(--font-mono)] text-sm font-bold mb-2">OpenAI Codex (CLI)</div>
+                <CodeBlock title="Terminal" lang="bash">{`export ${HOSTED_CODEX_TOKEN_ENV_VAR}="${HOSTED_TOKEN_PLACEHOLDER}" && codex mcp add security-detections --url ${HOSTED_MCP_URL} --bearer-token-env-var ${HOSTED_CODEX_TOKEN_ENV_VAR}`}</CodeBlock>
+                <p className="text-text-dim text-xs mt-2">
+                  Persist <code className="text-amber">{HOSTED_CODEX_TOKEN_ENV_VAR}</code> in your shell profile so Codex can read it in future sessions.
+                </p>
                 <p className="text-text-dim text-xs mt-2">
                   Or edit <code className="text-amber">~/.codex/config.toml</code>:
                 </p>
                 <CodeBlock title="~/.codex/config.toml" lang="toml">{`[mcp_servers.security-detections]
-type = "http"
-url = "https://detect.michaelhaag.org/api/mcp/mcp"
-headers = { Authorization = "Bearer sdmcp_YOUR_TOKEN_HERE" }`}</CodeBlock>
+url = "${HOSTED_MCP_URL}"
+bearer_token_env_var = "${HOSTED_CODEX_TOKEN_ENV_VAR}"`}</CodeBlock>
               </div>
 
               {/* Test with curl */}
               <div className="mt-4">
                 <div className="text-green font-[family-name:var(--font-mono)] text-sm font-bold mb-2">Verify with curl</div>
-                <CodeBlock title="Terminal" lang="bash">{`curl -X POST https://detect.michaelhaag.org/api/mcp/mcp \\
-  -H "Authorization: Bearer sdmcp_YOUR_TOKEN_HERE" \\
-  -H "Accept: application/json, text/event-stream" \\
-  -H "Content-Type: application/json" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</CodeBlock>
+                <CodeBlock title="Terminal" lang="bash">{`curl -X POST ${HOSTED_MCP_URL} -H "Authorization: Bearer ${HOSTED_TOKEN_PLACEHOLDER}" -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</CodeBlock>
               </div>
             </Step>
 
