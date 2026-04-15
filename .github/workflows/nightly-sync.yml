@@ -96,5 +96,6 @@ jobs:
       - name: Seed Supabase from SQLite
         run: cd web && npx tsx scripts/seed-from-sqlite.ts
         env:
+          SYNC_SOURCE_TYPE: nightly_full
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
