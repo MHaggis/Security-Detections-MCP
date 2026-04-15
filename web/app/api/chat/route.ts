@@ -124,14 +124,15 @@ export async function POST(request: NextRequest) {
     const modelInfo = getModelRoutingInfo(profile);
     const modelConfig = getModelConfig(profile);
     let modelUsed = modelInfo.model;
-    const isFree = profile?.tier !== 'pro' && profile?.tier !== 'admin' && !profile?.claude_api_key_encrypted && !profile?.openai_api_key_encrypted && !profile?.openrouter_api_key_encrypted;
+    const hasByokKeys = !!(profile?.claude_api_key_encrypted || profile?.openai_api_key_encrypted || profile?.openrouter_api_key_encrypted);
+    const useFreeModelPool = modelInfo.model.endsWith(':free') && !hasByokKeys;
 
     // For free tier: pre-fetch relevant data and inject into context (free models don't support tool calling)
     // For pro/BYOK: use tool calling for dynamic data lookup
     let systemPrompt = buildSystemPrompt();
     let content: string;
 
-    if (isFree) {
+    if (useFreeModelPool) {
       const lastUserMsg = messages[messages.length - 1]?.content || '';
 
       // For data-heavy queries, build the response with REAL DATA first,
@@ -197,8 +198,12 @@ Write a brief 2-3 sentence analysis of this data. Focus on: what looks good, wha
         }
 
         if (!responseData || responseData.error) {
+          const isProOrAdmin = profile?.tier === 'pro' || profile?.tier === 'admin';
+          const busyMessage = isProOrAdmin
+            ? 'Your Auto setting is using the free model pool, and those models are busy right now. Try again in a moment, or choose a specific model (Claude/GPT) in Account Settings.'
+            : 'The free AI models are currently busy. Please try again in a moment, or upgrade to Pro: https://github.com/sponsors/MHaggis';
           return new Response(
-            `The free AI models are currently busy. Please try again in a moment, or upgrade to Pro: https://github.com/sponsors/MHaggis`,
+            busyMessage,
             { status: 429 }
           );
         }

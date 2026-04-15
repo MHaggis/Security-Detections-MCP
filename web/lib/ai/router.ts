@@ -101,6 +101,16 @@ export function getModelRoutingInfo(profile: UserProfile | null): ModelRoutingIn
   }
 
   if (profile?.tier === 'pro' || profile?.tier === 'admin') {
+    if (profile.preferred_model === 'auto') {
+      return {
+        source: profile.tier === 'admin' ? 'admin' : 'pro',
+        provider: 'openrouter',
+        model: FREE_MODEL,
+        modelLabel: getModelLabel(FREE_MODEL),
+        note: 'Auto uses the free model pool by default. Pick Claude/GPT explicitly to use frontier models.',
+        fallbackModels: FREE_MODELS,
+      };
+    }
     const model = PRO_MODELS[profile.preferred_model] || PRO_MODELS['auto'];
     return {
       source: profile.tier === 'admin' ? 'admin' : 'pro',

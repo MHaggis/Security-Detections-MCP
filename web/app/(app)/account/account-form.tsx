@@ -33,8 +33,10 @@ export function AccountForm({ displayName, hasClaudeKey, hasOpenaiKey, hasOpenro
     autoOptionLabel = 'Auto (ignored while Claude BYOK key is set)';
   } else if (openaiSet) {
     autoOptionLabel = 'Auto (ignored while OpenAI BYOK key is set)';
-  } else if (openrouterSet || isProOrAdmin) {
+  } else if (openrouterSet) {
     autoOptionLabel = 'Auto (Claude Sonnet 4.6)';
+  } else if (isProOrAdmin) {
+    autoOptionLabel = 'Auto (Free model pool default)';
   } else if (isFreeNoByok) {
     autoOptionLabel = 'Auto (Nemotron 3 Super 120B - Free default)';
   }
@@ -153,6 +155,11 @@ export function AccountForm({ displayName, hasClaudeKey, hasOpenaiKey, hasOpenro
         {isFreeNoByok && (
           <p className="text-text-dim text-xs mt-2">
             Free tier currently uses the free model pool with default <code className="text-amber">nvidia/nemotron-3-super-120b-a12b:free</code>.
+          </p>
+        )}
+        {!openrouterSet && isProOrAdmin && (
+          <p className="text-text-dim text-xs mt-2">
+            On {tier.toUpperCase()}, <code className="text-amber">auto</code> uses the free model pool. Pick Claude/GPT explicitly to force frontier models.
           </p>
         )}
       </div>

@@ -106,7 +106,7 @@ Uses app-managed OpenRouter routing with your **Preferred Model** setting in `/a
 
 | Preferred Model | Routed model |
 |---|---|
-| `auto` | `anthropic/claude-sonnet-4-6` |
+| `auto` | Free model pool (default: `nvidia/nemotron-3-super-120b-a12b:free`) |
 | `claude` | `anthropic/claude-sonnet-4-6` |
 | `claude-opus` | `anthropic/claude-opus-4-6` |
 | `gpt` | `openai/gpt-5.4` |
