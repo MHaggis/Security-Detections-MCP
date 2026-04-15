@@ -79,8 +79,8 @@ After clicking, edit the installed server in **Cursor → Settings → MCP** and
 
 One-click install (opens VS Code):
 
-- **[Install in VS Code →](vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
-- **[Install in VS Code Insiders →](vscode-insiders:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
+- **[Install in VS Code →](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
+- **[Install in VS Code Insiders →](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?%7B%22name%22%3A%22security-detections%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//detect.michaelhaag.org/api/mcp/mcp%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20sdmcp_YOUR_TOKEN_HERE%22%7D%7D)**
 
 After clicking, edit the installed server in VS Code and replace the placeholder token. Or edit your MCP config directly:
 
