@@ -30,7 +30,7 @@ const handler = createMcpHandler(
       version: '1.0.0',
     },
     instructions:
-      'Hosted Security Detections MCP. Read-only access to ~8,000 detections from Sigma, Splunk ESCU, Elastic, KQL, Sublime, and CrowdStrike CQL. Start with get_stats() and get_coverage_summary(), then drill down with search, list_by_mitre, or analyze_actor_coverage.',
+      'Hosted Security Detections MCP. Read-only access to ~8,000 detections from Sigma, Splunk ESCU, Elastic, KQL, Sublime, CrowdStrike CQL, and Jamf Protect (macOS). Start with get_stats() and get_coverage_summary(), then drill down with search, list_by_mitre, or analyze_actor_coverage.',
   },
   {
     basePath: '/api/mcp',

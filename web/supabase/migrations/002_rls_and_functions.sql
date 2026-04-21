@@ -195,7 +195,7 @@ RETURNS JSON AS $$
     ),
     'sources_without_coverage', (
       SELECT array_agg(s.source_type)
-      FROM (VALUES ('sigma'), ('splunk_escu'), ('elastic'), ('kql'), ('sublime'), ('crowdstrike_cql')) AS s(source_type)
+      FROM (VALUES ('sigma'), ('splunk_escu'), ('elastic'), ('kql'), ('sublime'), ('crowdstrike_cql'), ('jamf_protect')) AS s(source_type)
       WHERE s.source_type NOT IN (
         SELECT DISTINCT d.source_type
         FROM detection_techniques dt JOIN detections d ON d.id = dt.detection_id
@@ -443,7 +443,7 @@ $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION compare_sources_for_technique(p_technique_id TEXT)
 RETURNS JSON AS $$
   WITH all_sources AS (
-    SELECT unnest(ARRAY['sigma','splunk_escu','elastic','kql','sublime','crowdstrike_cql']) as source_type
+    SELECT unnest(ARRAY['sigma','splunk_escu','elastic','kql','sublime','crowdstrike_cql','jamf_protect']) as source_type
   ),
   source_dets AS (
     SELECT d.source_type, COUNT(*) as count,
@@ -468,7 +468,7 @@ RETURNS JSON AS $$
     ),
     'total_detections', (SELECT COALESCE(SUM(count), 0) FROM source_dets),
     'sources_with_coverage', (SELECT COUNT(*) FROM source_dets),
-    'sources_without_coverage', 6 - (SELECT COUNT(*) FROM source_dets)
+    'sources_without_coverage', 7 - (SELECT COUNT(*) FROM source_dets)
   );
 $$ LANGUAGE sql STABLE;
 

@@ -345,6 +345,11 @@ cd sublime-rules && git sparse-checkout set detection-rules && cd ..
 git clone --depth 1 \\
   https://github.com/ByteRay-Labs/Query-Hub.git cql-hub
 
+# Jamf Protect custom analytic detections (macOS, ~80)
+git clone --depth 1 --filter=blob:none --sparse \\
+  https://github.com/jamf/jamfprotect.git
+cd jamfprotect && git sparse-checkout set custom_analytic_detections && cd ..
+
 # MITRE ATT&CK STIX data (172 actors, 691 techniques, 784 software)
 git clone --depth 1 \\
   https://github.com/mitre-attack/attack-stix-data.git
@@ -497,7 +502,7 @@ cd ..`}</CodeBlock>
           </div>
 
           <p className="text-text-dim text-center text-xs mt-6 font-[family-name:var(--font-mono)]">
-            + 60 more tools for Sigma, Splunk, Elastic, KQL, Sublime, and CrowdStrike CQL specific operations
+            + 60 more tools for Sigma, Splunk, Elastic, KQL, Sublime, CrowdStrike CQL, and Jamf Protect specific operations
           </p>
         </div>
       </section>

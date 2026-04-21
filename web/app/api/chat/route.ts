@@ -956,7 +956,7 @@ async function buildDataDrivenResponse(userMessage: string, userId?: string): Pr
   }
 
   // Compare sources: "compare sigma vs elastic for T1059"
-  const srcCompareMatch = msg.match(/compare\s+(sigma|splunk|elastic|kql|sublime|crowdstrike).*(?:vs|and|with).*(?:for\s+)?(T\d{4}(?:\.\d{3})?)/i)
+  const srcCompareMatch = msg.match(/compare\s+(sigma|splunk|elastic|kql|sublime|crowdstrike|jamf).*(?:vs|and|with).*(?:for\s+)?(T\d{4}(?:\.\d{3})?)/i)
     || msg.match(/compare.*(?:sources?|coverage).*(?:for\s+)?(T\d{4}(?:\.\d{3})?)/i);
   if (srcCompareMatch) {
     const techId = (srcCompareMatch[2] || srcCompareMatch[1]).toUpperCase();

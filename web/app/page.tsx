@@ -228,6 +228,7 @@ export default async function LandingPage() {
                 <SourceBadge name="Microsoft KQL" count="800+" />
                 <SourceBadge name="Sublime Security" count="500+" />
                 <SourceBadge name="CrowdStrike CQL" count="300+" />
+                <SourceBadge name="Jamf Protect (macOS)" count="80+" />
               </>
             )}
           </div>
