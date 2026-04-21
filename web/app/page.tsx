@@ -50,6 +50,7 @@ const sourceLabels: Record<string, string> = {
   kql: 'Microsoft KQL',
   sublime: 'Sublime Security',
   crowdstrike_cql: 'CrowdStrike CQL',
+  jamf_protect: 'Jamf Protect (macOS)',
 };
 
 function StatCard({ value, label, color }: { value: string; label: string; color: string }) {

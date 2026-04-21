@@ -743,6 +743,7 @@ async function buildDataDrivenResponse(userMessage: string, userId?: string): Pr
     sigma: 'sigma', splunk: 'splunk_escu', escu: 'splunk_escu',
     elastic: 'elastic', kql: 'kql', sublime: 'sublime',
     crowdstrike: 'crowdstrike_cql', cql: 'crowdstrike_cql',
+    jamf: 'jamf_protect', jamf_protect: 'jamf_protect', macos: 'jamf_protect',
   };
   const sourceKeys = Object.keys(sourceNames).join('|');
 

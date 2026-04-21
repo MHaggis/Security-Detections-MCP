@@ -253,7 +253,7 @@ async function compareSources(args: Record<string, string>): Promise<string> {
   const detIds = detTechRows?.map(d => d.detection_id) || [];
 
   const bySource: Record<string, { count: number; detections: string[] }> = {};
-  const allSources = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'];
+  const allSources = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'];
 
   for (const src of allSources) {
     bySource[src] = { count: 0, detections: [] };

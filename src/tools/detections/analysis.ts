@@ -37,7 +37,7 @@ export const analysisTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter by source type',
         },
         tactic: {
@@ -58,7 +58,7 @@ export const analysisTools = [
       },
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined;
       const tactic = args.tactic as string | undefined;
       const severity = args.severity as string | undefined;
 
@@ -83,13 +83,13 @@ export const analysisTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter by source type (optional - analyzes all if not specified)',
         },
       },
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined;
       const report = analyzeCoverage(sourceType);
       return report;
     },
@@ -108,7 +108,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter by source type (optional)',
         },
       },
@@ -116,7 +116,7 @@ export const analysisTools = [
     },
     handler: async (args) => {
       const threatProfile = args.threat_profile as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined;
 
       if (!threatProfile) {
         return {
@@ -145,7 +145,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter by source type (optional)',
         },
       },
@@ -153,7 +153,7 @@ export const analysisTools = [
     },
     handler: async (args) => {
       const techniqueId = args.technique_id as string;
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined;
 
       if (!techniqueId) {
         return {
@@ -202,7 +202,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter to specific source type (optional — includes all if omitted)',
         },
         tactic: {
@@ -232,7 +232,7 @@ export const analysisTools = [
       const layer = generateNavigatorLayer({
         name,
         description: args.description as string | undefined,
-        source_type: args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined,
+        source_type: args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined,
         tactic: args.tactic as string | undefined,
         severity: args.severity as string | undefined,
       });
@@ -257,7 +257,7 @@ export const analysisTools = [
         },
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Filter to specific source (optional — analyzes all if omitted)',
         },
         include_query_snippets: {
@@ -278,7 +278,7 @@ export const analysisTools = [
         return { error: true, code: 'INVALID_TECHNIQUE_ID', message: validation.error, suggestion: validation.suggestion, similar: validation.similar };
       }
 
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | undefined;
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect' | undefined;
       const includeSnippets = args.include_query_snippets === true;
 
       return analyzeProcedureCoverageForTechnique(techniqueId, sourceType, includeSnippets);
@@ -299,7 +299,7 @@ export const analysisTools = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+            enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           },
           description: 'Sources to compare (default: all available)',
         },

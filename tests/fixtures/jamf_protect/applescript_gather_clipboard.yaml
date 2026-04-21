@@ -1,0 +1,25 @@
+---
+name: AppleScriptClipboardActivity
+uuid: 96cea4cc-a944-4220-9f8d-99d91622a6f5
+longDescription: This detection functions by monitoring for when AppleScript is being used to potentially gather clipboard contents over a defined time period or to generate a dialogue box and request the user to enter the keychain password.
+level: 0
+inputType: GPProcessEvent
+tags:
+snapshotFiles: []
+filter: $event.type == 1 AND
+  $event.process.signingInfo.appid == "com.apple.osascript" AND
+  $event.process.commandLine CONTAINS[c] "the clipboard"
+actions:
+  - name: Log
+context: []
+categories:
+  - Collection
+version: 1
+severity: Informational
+shortDescription: The osascript binary has been launched to capture the contents of the clipboard.
+label: AppleScript Clipboard Activity
+remediation: null
+MitreCategories:
+  - LivingOffTheLand
+  - CredentialAccess
+

@@ -21,7 +21,7 @@ export interface ValidationResult {
 }
 
 export interface TechniqueIdFilters {
-  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
   tactic?: string;
   severity?: string;
 }
@@ -54,7 +54,7 @@ export interface DetectionSuggestion {
 export interface NavigatorLayerOptions {
   name: string;
   description?: string;
-  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+  source_type?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
   tactic?: string;
   severity?: string;
   actor_name?: string;
@@ -122,7 +122,7 @@ function rowToDetection(row: Record<string, unknown>): Detection {
     name: row.name as string,
     description: row.description as string || '',
     query: row.query as string || '',
-    source_type: row.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql',
+    source_type: row.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect',
     mitre_ids: safeJsonParse<string[]>(row.mitre_ids as string, []),
     logsource_category: row.logsource_category as string | null,
     logsource_product: row.logsource_product as string | null,
@@ -297,7 +297,7 @@ export function listDetections(limit: number = 100, offset: number = 0): Detecti
 /**
  * List detections filtered by source type.
  */
-export function listBySource(sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql', limit: number = 100, offset: number = 0): Detection[] {
+export function listBySource(sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect', limit: number = 100, offset: number = 0): Detection[] {
   const database = getDb();
   
   const stmt = database.prepare('SELECT * FROM detections WHERE source_type = ? ORDER BY name LIMIT ? OFFSET ?');
@@ -832,7 +832,7 @@ export function getTechniqueIds(filters: TechniqueIdFilters = {}): string[] {
 /**
  * Analyze coverage by tactic and identify strengths/weaknesses.
  */
-export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql'): CoverageReport {
+export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect'): CoverageReport {
   const database = getDb();
   
   let countSql = 'SELECT COUNT(DISTINCT id) as count FROM detections';
@@ -943,7 +943,7 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
  */
 export function identifyGaps(
   threatProfile: string,
-  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql'
+  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect'
 ): GapAnalysis {
   const targetTechniques = THREAT_PROFILES[threatProfile.toLowerCase()] || THREAT_PROFILES['apt'];
   
@@ -999,7 +999,7 @@ export function identifyGaps(
  */
 export function suggestDetections(
   techniqueId: string,
-  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql'
+  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect'
 ): DetectionSuggestion {
   const database = getDb();
   
@@ -1469,7 +1469,7 @@ export function searchDetectionList(query: string, limit: number = 500): Detecti
  * List detections by source with optional name filter, returning lightweight results.
  */
 export function listDetectionsBySourceLight(
-  sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql',
+  sourceType: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect',
   nameFilter?: string,
   limit: number = 500
 ): DetectionListItem[] {
@@ -1562,7 +1562,7 @@ export function compareDetectionsBySource(topic: string, limit: number = 100): S
  */
 export function getDetectionNamesByPattern(
   pattern: string,
-  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql'
+  sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect'
 ): { source: string; detections: Array<{ name: string; id: string }> }[] {
   const database = getDb();
   

@@ -365,6 +365,7 @@ cd ..`}</CodeBlock>
   -e KQL_PATHS="/path/to/kql-bertjanp" \\
   -e SUBLIME_PATHS="/path/to/sublime-rules/detection-rules" \\
   -e CQL_HUB_PATHS="/path/to/cql-hub/queries" \\
+  -e JAMF_PROTECT_PATHS="/path/to/jamfprotect/custom_analytic_detections" \\
   -e STORY_PATHS="/path/to/security_content/stories" \\
   -e ATTACK_STIX_PATH="/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json" \\
   -- npx -y security-detections-mcp`}</CodeBlock>
@@ -385,6 +386,7 @@ cd ..`}</CodeBlock>
         "KQL_PATHS": "/path/to/kql-bertjanp",
         "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",
         "ATTACK_STIX_PATH": "/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
@@ -409,6 +411,7 @@ cd ..`}</CodeBlock>
         "KQL_PATHS": "/path/to/kql-bertjanp",
         "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",
         "ATTACK_STIX_PATH": "/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }

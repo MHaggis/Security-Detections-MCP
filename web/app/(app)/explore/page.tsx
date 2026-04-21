@@ -9,6 +9,7 @@ const SOURCES = [
   { key: 'kql', label: 'KQL' },
   { key: 'sublime', label: 'Sublime' },
   { key: 'crowdstrike_cql', label: 'CrowdStrike' },
+  { key: 'jamf_protect', label: 'Jamf Protect' },
 ];
 
 function severityBadge(severity: string | null) {
@@ -30,6 +31,7 @@ function sourceBadge(source: string) {
     kql: 'bg-amber/10 text-amber border-amber/30',
     sublime: 'bg-red/10 text-red border-red/30',
     crowdstrike_cql: 'bg-amber/10 text-amber border-amber/30',
+    jamf_protect: 'bg-green/10 text-green border-green/30',
   };
   return colors[source] || 'bg-text-dim/10 text-text-dim border-text-dim/30';
 }
@@ -38,6 +40,7 @@ function sourceLabel(source: string) {
   const labels: Record<string, string> = {
     sigma: 'Sigma', splunk_escu: 'Splunk', elastic: 'Elastic',
     kql: 'KQL', sublime: 'Sublime', crowdstrike_cql: 'CrowdStrike',
+    jamf_protect: 'Jamf Protect',
   };
   return labels[source] || source;
 }

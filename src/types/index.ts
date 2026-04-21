@@ -23,6 +23,7 @@ export type {
   ElasticTechnique,
   SublimeRule,
   CqlHubRule,
+  JamfProtectRule,
 } from './detection.js';
 
 // Story types

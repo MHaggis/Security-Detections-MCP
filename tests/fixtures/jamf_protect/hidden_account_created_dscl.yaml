@@ -1,0 +1,25 @@
+---
+name: HiddenAccountCreatedDscl
+uuid: 7ee555e8-d911-4918-a9f1-c919675d02c5
+longDescription: This detection functions by monitoring on attempts using dcsl to create accounts that are hidden from the login window.
+level: 0
+inputType: GPProcessEvent
+tags:
+snapshotFiles: []
+filter: $event.type == 1 AND
+  ($event.process.path.lastPathComponent == "dscl" AND
+  ((ANY $event.process.args == "IsHidden") AND (ANY $event.process.args == "-create") AND (ANY $event.process.args IN {"true", "1", "yes"})))
+actions:
+  - name: Log
+context: []
+categories:
+  - Visibility
+  - Persistence
+version: 1
+severity: Informational
+shortDescription: A hidden user has been created using dscl.
+label: Hidden Account Created DSCL
+remediation: null
+MitreCategories:
+  - Persistence
+

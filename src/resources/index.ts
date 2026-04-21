@@ -256,7 +256,7 @@ function getTacticResource(tactic: string): unknown {
  * Get statistics and sample detections for a source type
  */
 function getSourceResource(sourceType: string): unknown {
-  const validSources = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'];
+  const validSources = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'];
   const normalizedSource = sourceType.toLowerCase();
 
   if (!validSources.includes(normalizedSource)) {
@@ -267,7 +267,7 @@ function getSourceResource(sourceType: string): unknown {
   }
 
   const detections = listBySource(
-    normalizedSource as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql',
+    normalizedSource as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect',
     50
   );
 
@@ -582,7 +582,7 @@ export async function readResource(uri: string) {
   // Navigator layer template: detection://navigator/layer/{sourceType}
   const navigatorMatch = uri.match(/^detection:\/\/navigator\/layer\/(.+)$/);
   if (navigatorMatch) {
-    const sourceType = decodeURIComponent(navigatorMatch[1]) as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+    const sourceType = decodeURIComponent(navigatorMatch[1]) as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
     content = generateNavigatorLayer({ name: `${sourceType} Detection Coverage`, source_type: sourceType });
     return formatResourceResponse(uri, mimeType, content);
   }

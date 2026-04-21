@@ -36,6 +36,18 @@
           "description": "Comma-separated paths to KQL hunting query directories (e.g., /path/to/kql-queries)"
         },
         {
+          "name": "SUBLIME_PATHS",
+          "description": "Comma-separated paths to Sublime Security rule directories (e.g., /path/to/sublime-rules/detection-rules)"
+        },
+        {
+          "name": "CQL_HUB_PATHS",
+          "description": "Comma-separated paths to CQL Hub (CrowdStrike) query directories (e.g., /path/to/cql-hub/queries)"
+        },
+        {
+          "name": "JAMF_PROTECT_PATHS",
+          "description": "Comma-separated paths to Jamf Protect custom analytic detection directories (macOS, e.g., /path/to/jamfprotect/custom_analytic_detections)"
+        },
+        {
           "name": "STORY_PATHS",
           "description": "Comma-separated paths to Splunk analytic story directories (optional, e.g., /path/to/security_content/stories)"
         }

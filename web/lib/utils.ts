@@ -35,6 +35,7 @@ export function sourceDisplayName(source: string): string {
     kql: 'Microsoft KQL',
     sublime: 'Sublime',
     crowdstrike_cql: 'CrowdStrike CQL',
+    jamf_protect: 'Jamf Protect',
   };
   return names[source] || source;
 }
@@ -48,6 +49,7 @@ export function sourceBadgeColor(source: string): string {
     kql: 'bg-amber/10 text-amber border-amber/30',
     sublime: 'bg-red/10 text-red border-red/30',
     crowdstrike_cql: 'bg-amber/10 text-amber border-amber/30',
+    jamf_protect: 'bg-green/10 text-green border-green/30',
   };
   return colors[source] || 'bg-text-dim/10 text-text-dim border-text-dim/30';
 }

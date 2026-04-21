@@ -151,6 +151,7 @@ Configure env vars to point at your detection repos:
 | `KQL_PATHS` | KQL hunting query directories |
 | `SUBLIME_PATHS` | Sublime Security rule directories |
 | `CQL_HUB_PATHS` | CQL Hub (CrowdStrike) query directories |
+| `JAMF_PROTECT_PATHS` | Jamf Protect custom analytic detection directories (macOS) |
 | `STORY_PATHS` | Splunk analytic story directories (optional) |
 | `ATTACK_STIX_PATH` | Path to `enterprise-attack.json` for threat actor data (optional) |
 

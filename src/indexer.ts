@@ -7,6 +7,7 @@ import { parseElasticFile } from './parsers/elastic.js';
 import { parseKqlFile, parseRawKqlFile } from './parsers/kql.js';
 import { parseSublimeFile } from './parsers/sublime.js';
 import { parseCqlHubFile } from './parsers/crowdstrike_cql.js';
+import { parseJamfProtectFile } from './parsers/jamf_protect.js';
 import { recreateDb, insertDetection, insertStory, getDetectionCount, initDb } from './db.js';
 
 // Recursively find all YAML files in a directory
@@ -139,6 +140,8 @@ export interface IndexResult {
   sublime_failed: number;
   cql_hub_indexed: number;
   cql_hub_failed: number;
+  jamf_protect_indexed: number;
+  jamf_protect_failed: number;
   stories_indexed: number;
   stories_failed: number;
   total: number;
@@ -151,7 +154,8 @@ export function indexDetections(
   elasticPaths: string[] = [],
   kqlPaths: string[] = [],
   sublimePaths: string[] = [],
-  cqlHubPaths: string[] = []
+  cqlHubPaths: string[] = [],
+  jamfProtectPaths: string[] = []
 ): IndexResult {
   // Recreate DB to ensure schema is up to date
   recreateDb();
@@ -169,6 +173,8 @@ export function indexDetections(
   let sublime_failed = 0;
   let cql_hub_indexed = 0;
   let cql_hub_failed = 0;
+  let jamf_protect_indexed = 0;
+  let jamf_protect_failed = 0;
   let stories_indexed = 0;
   let stories_failed = 0;
   
@@ -274,6 +280,21 @@ export function indexDetections(
     }
   }
 
+  // Index Jamf Protect custom analytic detections (YAML with NSPredicate filter)
+  for (const basePath of jamfProtectPaths) {
+    const files = findYamlFiles(basePath);
+
+    for (const file of files) {
+      const detection = parseJamfProtectFile(file);
+      if (detection) {
+        insertDetection(detection);
+        jamf_protect_indexed++;
+      } else {
+        jamf_protect_failed++;
+      }
+    }
+  }
+
   // Index Splunk Analytic Stories (optional)
   for (const basePath of storyPaths) {
     const files = findYamlFiles(basePath);
@@ -302,9 +323,11 @@ export function indexDetections(
     sublime_failed,
     cql_hub_indexed,
     cql_hub_failed,
+    jamf_protect_indexed,
+    jamf_protect_failed,
     stories_indexed,
     stories_failed,
-    total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed + sublime_indexed + cql_hub_indexed,
+    total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed + sublime_indexed + cql_hub_indexed + jamf_protect_indexed,
   };
 }
 

@@ -17,7 +17,7 @@ import {
   generateNavigatorLayer,
 } from '../../db/index.js';
 
-const SOURCE_TYPES = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'] as const;
+const SOURCE_TYPES = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'] as const;
 
 function stixNotLoadedError() {
   return {
