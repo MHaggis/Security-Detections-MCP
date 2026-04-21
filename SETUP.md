@@ -172,6 +172,7 @@ Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
         "STORY_PATHS": "/absolute/path/to/detections/security_content/stories",
         "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
     }
@@ -200,6 +201,7 @@ Add to `~/.vscode/mcp.json`:
         "STORY_PATHS": "/absolute/path/to/detections/security_content/stories",
         "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
     }
@@ -225,7 +227,8 @@ If you're running VS Code on Windows but your files are inside WSL:
         "KQL_PATHS": "/home/youruser/detections/kql-bertjanp",
         "STORY_PATHS": "/home/youruser/detections/security_content/stories",
         "SUBLIME_PATHS": "/home/youruser/detections/sublime-rules/detection-rules",
-        "CQL_HUB_PATHS": "/home/youruser/detections/cql-hub/queries"
+        "CQL_HUB_PATHS": "/home/youruser/detections/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/home/youruser/detections/jamfprotect/custom_analytic_detections"
       }
     }
   }
@@ -249,6 +252,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
         "SPLUNK_PATHS": "/absolute/path/to/detections/security_content/detections",
         "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
     }

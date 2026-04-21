@@ -41,6 +41,7 @@ export default async function DetectionDetailPage({
             detection.source_type === 'elastic' ? 'bg-orange/10 text-orange border-orange/30' :
             detection.source_type === 'kql' ? 'bg-amber/10 text-amber border-amber/30' :
             detection.source_type === 'sublime' ? 'bg-red/10 text-red border-red/30' :
+            detection.source_type === 'jamf_protect' ? 'bg-green/10 text-green border-green/30' :
             'bg-amber/10 text-amber border-amber/30'
           }`}>
             {detection.source_type}

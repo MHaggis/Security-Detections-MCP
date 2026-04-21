@@ -44,7 +44,7 @@ export interface DetectionRow {
 const DETECTION_LIST_COLUMNS =
   'id, name, description, source_type, severity, mitre_ids, mitre_tactics, detection_type, data_sources';
 
-const SOURCE_TYPES = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'] as const;
+const SOURCE_TYPES = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 export const ALL_SOURCE_TYPES = SOURCE_TYPES;
 

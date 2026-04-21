@@ -45,7 +45,7 @@ import {
 
 // ─── Schemas shared across tools ──────────────────────────────────────────
 
-const SOURCE_ENUM = z.enum(['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql']);
+const SOURCE_ENUM = z.enum(['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect']);
 const SEVERITY_ENUM = z.enum(['informational', 'low', 'medium', 'high', 'critical']);
 const TACTIC_ENUM = z.enum([
   'reconnaissance',
@@ -334,7 +334,7 @@ export function registerHostedTools(server: McpServer): void {
     'list_by_source',
     {
       title: 'List by Source',
-      description: 'List detections from a specific source (sigma, splunk_escu, elastic, kql, sublime, crowdstrike_cql).',
+      description: 'List detections from a specific source (sigma, splunk_escu, elastic, kql, sublime, crowdstrike_cql, jamf_protect).',
       inputSchema: {
         source_type: SOURCE_ENUM,
         limit: z.number().int().min(1).max(100).optional(),

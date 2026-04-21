@@ -21,7 +21,7 @@ export const AI_TOOLS: ToolDefinition[] = [
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Search query (keywords, technique IDs, CVEs, process names)' },
-          source: { type: 'string', description: 'Filter by source', enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'] },
+          source: { type: 'string', description: 'Filter by source', enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'] },
           severity: { type: 'string', description: 'Filter by severity', enum: ['critical', 'high', 'medium', 'low'] },
           limit: { type: 'string', description: 'Max results (default 10)' },
         },

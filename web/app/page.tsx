@@ -50,6 +50,7 @@ const sourceLabels: Record<string, string> = {
   kql: 'Microsoft KQL',
   sublime: 'Sublime Security',
   crowdstrike_cql: 'CrowdStrike CQL',
+  jamf_protect: 'Jamf Protect (macOS)',
 };
 
 function StatCard({ value, label, color }: { value: string; label: string; color: string }) {
@@ -227,6 +228,7 @@ export default async function LandingPage() {
                 <SourceBadge name="Microsoft KQL" count="800+" />
                 <SourceBadge name="Sublime Security" count="500+" />
                 <SourceBadge name="CrowdStrike CQL" count="300+" />
+                <SourceBadge name="Jamf Protect (macOS)" count="80+" />
               </>
             )}
           </div>

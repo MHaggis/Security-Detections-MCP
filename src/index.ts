@@ -32,21 +32,22 @@ const STORY_PATHS = parsePaths(process.env.STORY_PATHS);
 const KQL_PATHS = parsePaths(process.env.KQL_PATHS);
 const SUBLIME_PATHS = parsePaths(process.env.SUBLIME_PATHS);
 const CQL_HUB_PATHS = parsePaths(process.env.CQL_HUB_PATHS);
+const JAMF_PROTECT_PATHS = parsePaths(process.env.JAMF_PROTECT_PATHS);
 const ATTACK_STIX_PATH = process.env.ATTACK_STIX_PATH;
 
 // Auto-index on startup if paths are configured and DB is empty
 function autoIndex(): void {
-  if (SIGMA_PATHS.length === 0 && SPLUNK_PATHS.length === 0 && ELASTIC_PATHS.length === 0 && KQL_PATHS.length === 0 && SUBLIME_PATHS.length === 0 && CQL_HUB_PATHS.length === 0) {
+  if (SIGMA_PATHS.length === 0 && SPLUNK_PATHS.length === 0 && ELASTIC_PATHS.length === 0 && KQL_PATHS.length === 0 && SUBLIME_PATHS.length === 0 && CQL_HUB_PATHS.length === 0 && JAMF_PROTECT_PATHS.length === 0) {
     return;
   }
-  
+
   initDb();
-  
+
   if (needsIndexing()) {
     console.error('[security-detections-mcp] Auto-indexing detections...');
-    const result = indexDetections(SIGMA_PATHS, SPLUNK_PATHS, STORY_PATHS, ELASTIC_PATHS, KQL_PATHS, SUBLIME_PATHS, CQL_HUB_PATHS);
+    const result = indexDetections(SIGMA_PATHS, SPLUNK_PATHS, STORY_PATHS, ELASTIC_PATHS, KQL_PATHS, SUBLIME_PATHS, CQL_HUB_PATHS, JAMF_PROTECT_PATHS);
     let msg = `[security-detections-mcp] Indexed ${result.total} detections`;
-    msg += ` (${result.sigma_indexed} Sigma, ${result.splunk_indexed} Splunk, ${result.elastic_indexed} Elastic, ${result.kql_indexed} KQL, ${result.sublime_indexed} Sublime, ${result.cql_hub_indexed} CrowdStrike CQL)`;
+    msg += ` (${result.sigma_indexed} Sigma, ${result.splunk_indexed} Splunk, ${result.elastic_indexed} Elastic, ${result.kql_indexed} KQL, ${result.sublime_indexed} Sublime, ${result.cql_hub_indexed} CrowdStrike CQL, ${result.jamf_protect_indexed} Jamf Protect)`;
     if (result.stories_indexed > 0) {
       msg += `, ${result.stories_indexed} stories`;
     }

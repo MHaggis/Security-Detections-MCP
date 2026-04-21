@@ -345,6 +345,11 @@ cd sublime-rules && git sparse-checkout set detection-rules && cd ..
 git clone --depth 1 \\
   https://github.com/ByteRay-Labs/Query-Hub.git cql-hub
 
+# Jamf Protect custom analytic detections (macOS, ~80)
+git clone --depth 1 --filter=blob:none --sparse \\
+  https://github.com/jamf/jamfprotect.git
+cd jamfprotect && git sparse-checkout set custom_analytic_detections && cd ..
+
 # MITRE ATT&CK STIX data (172 actors, 691 techniques, 784 software)
 git clone --depth 1 \\
   https://github.com/mitre-attack/attack-stix-data.git
@@ -365,6 +370,7 @@ cd ..`}</CodeBlock>
   -e KQL_PATHS="/path/to/kql-bertjanp" \\
   -e SUBLIME_PATHS="/path/to/sublime-rules/detection-rules" \\
   -e CQL_HUB_PATHS="/path/to/cql-hub/queries" \\
+  -e JAMF_PROTECT_PATHS="/path/to/jamfprotect/custom_analytic_detections" \\
   -e STORY_PATHS="/path/to/security_content/stories" \\
   -e ATTACK_STIX_PATH="/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json" \\
   -- npx -y security-detections-mcp`}</CodeBlock>
@@ -385,6 +391,7 @@ cd ..`}</CodeBlock>
         "KQL_PATHS": "/path/to/kql-bertjanp",
         "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",
         "ATTACK_STIX_PATH": "/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
@@ -409,6 +416,7 @@ cd ..`}</CodeBlock>
         "KQL_PATHS": "/path/to/kql-bertjanp",
         "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
+        "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",
         "ATTACK_STIX_PATH": "/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
       }
@@ -494,7 +502,7 @@ cd ..`}</CodeBlock>
           </div>
 
           <p className="text-text-dim text-center text-xs mt-6 font-[family-name:var(--font-mono)]">
-            + 60 more tools for Sigma, Splunk, Elastic, KQL, Sublime, and CrowdStrike CQL specific operations
+            + 60 more tools for Sigma, Splunk, Elastic, KQL, Sublime, CrowdStrike CQL, and Jamf Protect specific operations
           </p>
         </div>
       </section>

@@ -11,7 +11,7 @@ export interface Detection {
   name: string;
   description: string;
   query: string; // detection logic (YAML for Sigma, SPL for Splunk, EQL/KQL for Elastic, MQL for Sublime)
-  source_type: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+  source_type: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
   mitre_ids: string[];
   logsource_category: string | null;
   logsource_product: string | null;
@@ -55,7 +55,7 @@ export interface Detection {
 export interface DetectionSummary {
   id: string;
   name: string;
-  source_type: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+  source_type: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
   mitre_ids: string[];
   severity: string | null;
   mitre_tactics: string[];
@@ -193,6 +193,30 @@ export interface ElasticTechnique {
   name?: string;
   reference?: string;
   subtechnique?: ElasticTechnique[];
+}
+
+/**
+ * Jamf Protect custom analytic detection structure (YAML with NSPredicate filter).
+ * @see https://github.com/jamf/jamfprotect/tree/main/custom_analytic_detections
+ */
+export interface JamfProtectRule {
+  name: string;
+  uuid?: string;
+  label?: string;
+  shortDescription?: string;
+  longDescription?: string;
+  level?: number;
+  inputType?: 'GPProcessEvent' | 'GPFSEvent' | 'GPKeylogRegisterEvent' | 'GPUSBEvent' | string;
+  filter: string;
+  severity?: 'Informational' | 'Low' | 'Medium' | 'High' | 'Critical' | string;
+  categories?: string[];
+  MitreCategories?: string[] | null;
+  tags?: string[] | null;
+  snapshotFiles?: string[] | null;
+  actions?: Array<{ name?: string } | string>;
+  context?: string[] | null;
+  version?: number;
+  remediation?: string | null;
 }
 
 /**

@@ -169,7 +169,7 @@ export function createServer(): Server {
         break;
       case 'source_type':
       case 'source':
-        values = ['sigma', 'splunk_escu', 'elastic', 'kql'].filter(s => 
+        values = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'].filter(s =>
           s.toLowerCase().startsWith(prefix.toLowerCase())
         );
         break;

@@ -20,11 +20,12 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "test": "npm run build && node tests/cross-platform-test.js && node tests/integration-test.js && node tests/engineering-tools-test.js",
+    "test": "npm run build && node tests/cross-platform-test.js && node tests/jamf-parser-test.js && node tests/integration-test.js && node tests/engineering-tools-test.js",
     "test:platform": "npm run build && node tests/cross-platform-test.js",
     "test:ci": "npm run build && node tests/ci-integration-test.js",
     "test:integration": "npm run build && node tests/integration-test.js",
     "test:engineering": "npm run build && node tests/engineering-tools-test.js",
+    "test:jamf": "npm run build && node tests/jamf-parser-test.js",
     "lint": "tsc --noEmit --strict",
     "prepublishOnly": "npm run build && npm run lint"
   },
@@ -43,6 +44,8 @@
     "sublime",
     "crowdstrike",
     "cql",
+    "jamf",
+    "macos",
     "siem",
     "mitre",
     "attack"

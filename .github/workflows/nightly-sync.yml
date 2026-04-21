@@ -50,6 +50,10 @@ jobs:
           # CrowdStrike CQL Hub
           git clone --depth 1 https://github.com/ByteRay-Labs/Query-Hub.git /tmp/repos/cql-hub
 
+          # Jamf Protect custom analytic detections (macOS)
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/jamf/jamfprotect.git /tmp/repos/jamfprotect
+          cd /tmp/repos/jamfprotect && git sparse-checkout set custom_analytic_detections && cd -
+
           # MITRE ATT&CK STIX data
           git clone --depth 1 https://github.com/mitre-attack/attack-stix-data.git /tmp/repos/stix
 
@@ -66,6 +70,7 @@ jobs:
           KQL_PATHS: /tmp/repos/kql-bertjanp,/tmp/repos/kql-jkerai1
           SUBLIME_PATHS: /tmp/repos/sublime/detection-rules
           CQL_HUB_PATHS: /tmp/repos/cql-hub/queries
+          JAMF_PROTECT_PATHS: /tmp/repos/jamfprotect/custom_analytic_detections
           ATTACK_STIX_PATH: /tmp/repos/stix/enterprise-attack/enterprise-attack.json
 
       - name: Wait for MCP server to finish indexing

@@ -168,6 +168,28 @@ test('Splunk detections have consistent structure', () => {
   }
 });
 
+test('Jamf Protect detections have macOS shape (if indexed)', () => {
+  const jamf = listBySource('jamf_protect', 50);
+
+  if (jamf.length === 0) {
+    console.log('   (No Jamf Protect rules indexed - skipping)');
+    return;
+  }
+
+  for (const rule of jamf.slice(0, 10)) {
+    assert(rule.id, 'Jamf detection should have an ID');
+    assert(rule.name, 'Jamf detection should have a name');
+    assert(rule.query, 'Jamf detection should have a filter/query');
+    assert(rule.platforms && rule.platforms.includes('macos'),
+      `Jamf detection "${rule.name}" should declare macos platform`);
+    if (rule.severity) {
+      assert(rule.severity === rule.severity.toLowerCase(),
+        `Jamf severity should be lowercased, got ${rule.severity}`);
+    }
+  }
+  console.log(`   ${jamf.length} Jamf Protect detections indexed`);
+});
+
 test('KQL rules have consistent structure (if indexed)', () => {
   const kqlRules = listBySource('kql', 50);
   

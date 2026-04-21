@@ -26,7 +26,7 @@ export const filterTools = [
       properties: {
         source_type: {
           type: 'string',
-          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql'],
+          enum: ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'],
           description: 'Source type to filter by',
         },
         limit: {
@@ -41,7 +41,7 @@ export const filterTools = [
       required: ['source_type'],
     },
     handler: async (args) => {
-      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql';
+      const sourceType = args.source_type as 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect';
       const limit = (args.limit as number) || 100;
       const offset = (args.offset as number) || 0;
 

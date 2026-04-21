@@ -27,12 +27,12 @@ const siteUrl = 'https://detect.michaelhaag.org';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: 'Security Detections | AI-Powered Detection Coverage Intelligence',
-  description: 'Search 8,295+ security detections across Sigma, Splunk, Elastic, KQL, Sublime, and CrowdStrike. AI-powered coverage analysis, threat actor mapping, and gap assessment.',
+  description: 'Search 8,375+ security detections across Sigma, Splunk, Elastic, KQL, Sublime, CrowdStrike, and Jamf Protect (macOS). AI-powered coverage analysis, threat actor mapping, and gap assessment.',
   keywords: ['security detections', 'MITRE ATT&CK', 'Sigma rules', 'Splunk detections', 'threat coverage', 'detection engineering'],
   authors: [{ name: 'Michael Haag' }],
   openGraph: {
     title: 'Security Detections',
-    description: 'Search 8,295+ security detections across Sigma, Splunk, Elastic, KQL, Sublime, and CrowdStrike. AI-powered coverage analysis, threat actor mapping, and gap assessment.',
+    description: 'Search 8,375+ security detections across Sigma, Splunk, Elastic, KQL, Sublime, CrowdStrike, and Jamf Protect (macOS). AI-powered coverage analysis, threat actor mapping, and gap assessment.',
     url: siteUrl,
     siteName: 'Security Detections',
     type: 'website',
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Security Detections',
-    description: 'AI-Powered Detection Coverage Intelligence — 8,295+ detections across Sigma, Splunk, Elastic, KQL, Sublime, and CrowdStrike.',
+    description: 'AI-Powered Detection Coverage Intelligence — 8,375+ detections across Sigma, Splunk, Elastic, KQL, Sublime, CrowdStrike, and Jamf Protect.',
   },
 };
 

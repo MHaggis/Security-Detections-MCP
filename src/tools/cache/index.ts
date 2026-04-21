@@ -27,6 +27,9 @@ const SPLUNK_PATHS = parsePaths(process.env.SPLUNK_PATHS);
 const ELASTIC_PATHS = parsePaths(process.env.ELASTIC_PATHS);
 const STORY_PATHS = parsePaths(process.env.STORY_PATHS);
 const KQL_PATHS = parsePaths(process.env.KQL_PATHS);
+const SUBLIME_PATHS = parsePaths(process.env.SUBLIME_PATHS);
+const CQL_HUB_PATHS = parsePaths(process.env.CQL_HUB_PATHS);
+const JAMF_PROTECT_PATHS = parsePaths(process.env.JAMF_PROTECT_PATHS);
 
 // =============================================================================
 // Saved Query Tools
@@ -179,10 +182,10 @@ const rebuildIndexTool = defineTool({
     const confirmArg = args?.confirm as boolean;
     const skipElicitation = args?.skip_elicitation as boolean;
     
-    if (SIGMA_PATHS.length === 0 && SPLUNK_PATHS.length === 0 && ELASTIC_PATHS.length === 0 && KQL_PATHS.length === 0) {
+    if (SIGMA_PATHS.length === 0 && SPLUNK_PATHS.length === 0 && ELASTIC_PATHS.length === 0 && KQL_PATHS.length === 0 && SUBLIME_PATHS.length === 0 && CQL_HUB_PATHS.length === 0 && JAMF_PROTECT_PATHS.length === 0) {
       return {
         error: true,
-        message: 'No paths configured. Set SIGMA_PATHS, SPLUNK_PATHS, ELASTIC_PATHS, and/or KQL_PATHS environment variables.',
+        message: 'No paths configured. Set SIGMA_PATHS, SPLUNK_PATHS, ELASTIC_PATHS, KQL_PATHS, SUBLIME_PATHS, CQL_HUB_PATHS, and/or JAMF_PROTECT_PATHS environment variables.',
       };
     }
 
@@ -257,7 +260,7 @@ const rebuildIndexTool = defineTool({
     // Recreate DB to apply schema changes
     recreateDb();
 
-    const result = indexDetections(SIGMA_PATHS, SPLUNK_PATHS, STORY_PATHS, ELASTIC_PATHS, KQL_PATHS);
+    const result = indexDetections(SIGMA_PATHS, SPLUNK_PATHS, STORY_PATHS, ELASTIC_PATHS, KQL_PATHS, SUBLIME_PATHS, CQL_HUB_PATHS, JAMF_PROTECT_PATHS);
     
     // Notify subscribers that resources have changed
     try {
