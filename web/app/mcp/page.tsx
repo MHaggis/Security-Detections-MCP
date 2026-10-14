@@ -341,6 +341,11 @@ git clone --depth 1 --filter=blob:none --sparse \\
   https://github.com/sublime-security/sublime-rules.git
 cd sublime-rules && git sparse-checkout set detection-rules && cd ..
 
+# delivr.to Sublime MQL rules (~40+, same format as Sublime)
+git clone --depth 1 --filter=blob:none --sparse \\
+  https://github.com/delivr-to/detections.git delivr-detections
+cd delivr-detections && git sparse-checkout set sublime-rules && cd ..
+
 # CrowdStrike CQL Hub (~139+)
 git clone --depth 1 \\
   https://github.com/ByteRay-Labs/Query-Hub.git cql-hub
@@ -368,7 +373,7 @@ cd ..`}</CodeBlock>
   -e SPLUNK_PATHS="/path/to/security_content/detections" \\
   -e ELASTIC_PATHS="/path/to/detection-rules/rules" \\
   -e KQL_PATHS="/path/to/kql-bertjanp" \\
-  -e SUBLIME_PATHS="/path/to/sublime-rules/detection-rules" \\
+  -e SUBLIME_PATHS="/path/to/sublime-rules/detection-rules,/path/to/delivr-detections/sublime-rules" \\
   -e CQL_HUB_PATHS="/path/to/cql-hub/queries" \\
   -e JAMF_PROTECT_PATHS="/path/to/jamfprotect/custom_analytic_detections" \\
   -e STORY_PATHS="/path/to/security_content/stories" \\
@@ -389,7 +394,7 @@ cd ..`}</CodeBlock>
         "SPLUNK_PATHS": "/path/to/security_content/detections",
         "ELASTIC_PATHS": "/path/to/detection-rules/rules",
         "KQL_PATHS": "/path/to/kql-bertjanp",
-        "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules,/path/to/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",
@@ -414,7 +419,7 @@ cd ..`}</CodeBlock>
         "SPLUNK_PATHS": "/path/to/security_content/detections",
         "ELASTIC_PATHS": "/path/to/detection-rules/rules",
         "KQL_PATHS": "/path/to/kql-bertjanp",
-        "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/path/to/sublime-rules/detection-rules,/path/to/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/path/to/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/path/to/jamfprotect/custom_analytic_detections",
         "STORY_PATHS": "/path/to/security_content/stories",

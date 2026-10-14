@@ -137,6 +137,10 @@ git clone --depth 1 https://github.com/jkerai1/KQL-Queries.git kql-jkerai1
 git clone --depth 1 --filter=blob:none --sparse https://github.com/sublime-security/sublime-rules.git
 cd sublime-rules && git sparse-checkout set detection-rules && cd ..
 
+# delivr.to Sublime MQL rules (~40+ email payload rules, indexed via SUBLIME_PATHS)
+git clone --depth 1 --filter=blob:none --sparse https://github.com/delivr-to/detections.git delivr-detections
+cd delivr-detections && git sparse-checkout set sublime-rules && cd ..
+
 # CrowdStrike CQL Hub (~139+ queries)
 git clone --depth 1 https://github.com/ByteRay-Labs/Query-Hub.git cql-hub
 
@@ -146,7 +150,7 @@ git clone --depth 1 https://github.com/mitre-attack/attack-stix-data.git
 cd ..
 ```
 
-> **Tip**: You don't need all of them. Start with Sigma if you're unsure -- it's the most portable. Sublime is great for email-based threat detections, and CQL Hub covers CrowdStrike-specific queries.
+> **Tip**: You don't need all of them. Start with Sigma if you're unsure -- it's the most portable. Sublime (plus the delivr.to Sublime rules) is great for email-based threat detections, and CQL Hub covers CrowdStrike-specific queries.
 
 ---
 
@@ -170,7 +174,7 @@ Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
         "ELASTIC_PATHS": "/absolute/path/to/detections/detection-rules/rules",
         "KQL_PATHS": "/absolute/path/to/detections/kql-bertjanp,/absolute/path/to/detections/kql-jkerai1",
         "STORY_PATHS": "/absolute/path/to/detections/security_content/stories",
-        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules,/absolute/path/to/detections/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
@@ -199,7 +203,7 @@ Add to `~/.vscode/mcp.json`:
         "ELASTIC_PATHS": "/absolute/path/to/detections/detection-rules/rules",
         "KQL_PATHS": "/absolute/path/to/detections/kql-bertjanp,/absolute/path/to/detections/kql-jkerai1",
         "STORY_PATHS": "/absolute/path/to/detections/security_content/stories",
-        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules,/absolute/path/to/detections/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
@@ -226,7 +230,7 @@ If you're running VS Code on Windows but your files are inside WSL:
         "ELASTIC_PATHS": "/home/youruser/detections/detection-rules/rules",
         "KQL_PATHS": "/home/youruser/detections/kql-bertjanp",
         "STORY_PATHS": "/home/youruser/detections/security_content/stories",
-        "SUBLIME_PATHS": "/home/youruser/detections/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/home/youruser/detections/sublime-rules/detection-rules,/home/youruser/detections/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/home/youruser/detections/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/home/youruser/detections/jamfprotect/custom_analytic_detections"
       }
@@ -250,7 +254,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
       "env": {
         "SIGMA_PATHS": "/absolute/path/to/detections/sigma/rules",
         "SPLUNK_PATHS": "/absolute/path/to/detections/security_content/detections",
-        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules",
+        "SUBLIME_PATHS": "/absolute/path/to/detections/sublime-rules/detection-rules,/absolute/path/to/detections/delivr-detections/sublime-rules",
         "CQL_HUB_PATHS": "/absolute/path/to/detections/cql-hub/queries",
         "JAMF_PROTECT_PATHS": "/absolute/path/to/detections/jamfprotect/custom_analytic_detections",
         "ATTACK_STIX_PATH": "/absolute/path/to/attack-stix-data/enterprise-attack/enterprise-attack.json"
