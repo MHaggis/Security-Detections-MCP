@@ -8,7 +8,8 @@ import { parseKqlFile, parseRawKqlFile } from './parsers/kql.js';
 import { parseSublimeFile } from './parsers/sublime.js';
 import { parseCqlHubFile } from './parsers/crowdstrike_cql.js';
 import { parseJamfProtectFile } from './parsers/jamf_protect.js';
-import { recreateDb, insertDetection, insertStory, getDetectionCount, initDb } from './db.js';
+import { recreateDb, insertDetection, insertStory, getDetectionCount, initDb, closeDb as closeIndexerDb } from './db.js';
+import { closeDb as closeQueryDb } from './db/connection.js';
 
 // Recursively find all YAML files in a directory
 function findYamlFiles(dir: string): string[] {
@@ -148,6 +149,27 @@ export interface IndexResult {
 }
 
 export function indexDetections(
+  sigmaPaths: string[],
+  splunkPaths: string[],
+  storyPaths: string[] = [],
+  elasticPaths: string[] = [],
+  kqlPaths: string[] = [],
+  sublimePaths: string[] = [],
+  cqlHubPaths: string[] = [],
+  jamfProtectPaths: string[] = []
+): IndexResult {
+  // The server may already have its query connection open. Windows cannot
+  // unlink that database while either singleton holds a handle to it.
+  closeQueryDb();
+  try {
+    return buildIndex(sigmaPaths, splunkPaths, storyPaths, elasticPaths,
+      kqlPaths, sublimePaths, cqlHubPaths, jamfProtectPaths);
+  } finally {
+    closeIndexerDb();
+  }
+}
+
+function buildIndex(
   sigmaPaths: string[],
   splunkPaths: string[],
   storyPaths: string[] = [],
@@ -332,5 +354,9 @@ export function indexDetections(
 }
 
 export function needsIndexing(): boolean {
-  return getDetectionCount() === 0;
+  try {
+    return getDetectionCount() === 0;
+  } finally {
+    closeIndexerDb();
+  }
 }

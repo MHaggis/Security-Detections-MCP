@@ -15,7 +15,9 @@
 
 import './isolated-db.js';
 import { initDb, getDb, dbExists, recreateDb, closeDb, getDbPath, getCacheDir } from '../dist/db/connection.js';
-import { getDbPath as getLegacyDbPath } from '../dist/db.js';
+import { getDbPath as getLegacyDbPath, initDb as initIndexerDb } from '../dist/db.js';
+import { indexDetections, needsIndexing } from '../dist/indexer.js';
+import { fileURLToPath } from 'url';
 import { initPatternsSchema } from '../dist/db/patterns.js';
 import { existsSync } from 'fs';
 import { platform } from 'os';
@@ -215,6 +217,21 @@ test('Multiple close calls dont crash', () => {
 // =============================================================================
 // FINAL CLEANUP
 // =============================================================================
+
+test('Indexing closes existing query and indexer handles before replacing the database', () => {
+  const queryConnection = initDb();
+  const indexerConnection = initIndexerDb();
+  const fixturePath = fileURLToPath(new URL('./fixtures/jamf_protect', import.meta.url));
+  const result = indexDetections([], [], [], [], [], [], [], [fixturePath]);
+  assert(result.jamf_protect_indexed === 3, 'All fixture detections must be indexed');
+  assert(!queryConnection.open, 'The old query connection must be closed');
+  assert(!indexerConnection.open, 'The old indexer connection must be closed');
+  assert(getDb().prepare('SELECT COUNT(*) AS count FROM detections').get().count === 3,
+    'Reopened query connection must read the replacement database');
+  assert(!needsIndexing(), 'Index check must see fixture content');
+  // needsIndexing must not leave a hidden handle that prevents this on Windows.
+  recreateDb();
+});
 
 test('Clean up test data', () => {
   recreateDb();

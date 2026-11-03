@@ -15,7 +15,7 @@ change hosted authentication/database policy.
 | ID | Behavior | Acceptance evidence |
 | --- | --- | --- |
 | HEALTH-001 | Legacy nested and current top-level Splunk metadata preserve technique, story, CVE, asset and date fields; explicit top-level metadata wins. | `tests/splunk-parser-test.js`; current upstream content integration and engineering suites. |
-| HEALTH-002 | Default user cache path remains unchanged. Both SQLite entry points honor `DETECTIONS_DB_PATH`. Destructive tests always select disposable databases and close connections before cleanup. | `tests/cross-platform-test.js`; independent source review; Linux/Windows CI. |
+| HEALTH-002 | Default user cache path remains unchanged. Both SQLite entry points honor `DETECTIONS_DB_PATH`. The indexer releases query connections before replacing the database and its own connection afterward. Destructive tests use disposable databases and close connections before cleanup. | `tests/cross-platform-test.js`; independent source review; Linux/Windows CI. |
 | HEALTH-003 | The built server initializes over real MCP stdio, advertises core tools, returns indexed fixture data, and rejects unknown tools. | `tests/mcp-smoke-test.js`, enforced without `continue-on-error` in CI. |
 | HEALTH-004 | Source and compiled agents resolve the local database independently of the caller's working directory; absent databases remain pending. | Four subprocess integration cases in `agents/tests/tools/mcp-client.test.ts`. |
 | HEALTH-005 | Compiled agent package entry points exist and structured-response tests match production contracts. | Agent build/typecheck, Vitest, dry-run CLI smoke checks and package import. |
