@@ -13,6 +13,7 @@
  * - learn_from_feedback
  */
 
+import './indexed-db.js';
 import { initDb } from '../dist/db/connection.js';
 import { initPatternsSchema, getPatternsByTechnique, getFieldReference, getMacroReference, getPatternStats, storeStyleConvention, getStyleConventions } from '../dist/db/patterns.js';
 import { searchDetections, listByMitre } from '../dist/db/detections.js';

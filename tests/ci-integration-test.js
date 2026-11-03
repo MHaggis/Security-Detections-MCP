@@ -12,6 +12,7 @@
 
 // Import from db.js (not db/connection.js) because the indexer uses db.js.
 // They have separate singletons, so we need the same one the indexer writes to.
+import './isolated-db.js';
 import { initDb, recreateDb, dbExists, searchDetections } from '../dist/db.js';
 import { indexDetections } from '../dist/indexer.js';
 import { platform } from 'os';
