@@ -5,13 +5,11 @@
  */
 
 import Database from 'better-sqlite3';
-import { homedir, platform } from 'os';
-import { join } from 'path';
+import { platform } from 'os';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { createSchema } from './schema.js';
 
-const CACHE_DIR = join(homedir(), '.cache', 'security-detections-mcp');
-const DB_PATH = join(CACHE_DIR, 'detections.sqlite');
+import { CACHE_DIR, DB_PATH } from './paths.js';
 
 let db: Database.Database | null = null;
 

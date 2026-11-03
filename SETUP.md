@@ -24,7 +24,7 @@ Get the autonomous detection engineering platform running on your machine.
 
 | Requirement | Version | Check |
 |-------------|---------|-------|
-| **Node.js** | 20+ (agents require 20+, MCP server needs 18+) | `node --version` |
+| **Node.js** | MCP server: 20+; agents: 20.19+ or 22.12+ (22 LTS recommended) | `node --version` |
 | **npm** | 9+ | `npm --version` |
 | **git** | Any recent | `git --version` |
 | **Python** | 3.10+ (only for validation tools like contentctl, pySigma) | `python3 --version` |

@@ -5,11 +5,17 @@ on:
     branches: [main, develop]
     paths:
       - 'agents/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/agents-cli.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'agents/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/agents-cli.yml'
 
 defaults:
@@ -25,9 +31,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-      - run: npm install --registry https://registry.npmjs.org/
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Build local MCP database integration
+        run: npm ci --prefix .. && npm run build --prefix ..
+      - run: npm test -- --run
       - name: Verify dist output
         run: test -f dist/src/cli.js && test -f dist/graphs/detection-pipeline.js
 
@@ -102,10 +111,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-      - run: npm install --registry https://registry.npmjs.org/
+      - run: npm ci
       - name: '${{ matrix.test }}'
         run: |
-          OUTPUT=$(${{ matrix.cmd }} 2>&1) || true
+          OUTPUT=$(${{ matrix.cmd }} 2>&1)
           echo "$OUTPUT"
           echo "$OUTPUT" | grep -qF '${{ matrix.expect }}'
 
@@ -120,7 +129,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-      - run: npm install --registry https://registry.npmjs.org/
+      - run: npm ci
 
       - name: 'orchestrate with no input exits non-zero'
         run: |

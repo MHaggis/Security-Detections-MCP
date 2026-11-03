@@ -1,0 +1,15 @@
+# Explicit empty metadata must not revive stale legacy values.
+name: Synthetic Empty Metadata
+id: fixture-splunk-empty
+search: '| search process_name="powershell.exe"'
+analytic_story: []
+mitre_attack_id: []
+cve: []
+asset_type: ''
+security_domain: null
+tags:
+  analytic_story: [Legacy Story]
+  mitre_attack_id: [T1003.001]
+  cve: [CVE-2026-0001]
+  asset_type: Legacy Asset
+  security_domain: endpoint

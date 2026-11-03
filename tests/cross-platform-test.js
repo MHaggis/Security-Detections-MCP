@@ -13,7 +13,11 @@
  * 5. WAL/journal file cleanup
  */
 
+import './isolated-db.js';
 import { initDb, getDb, dbExists, recreateDb, closeDb, getDbPath, getCacheDir } from '../dist/db/connection.js';
+import { getDbPath as getLegacyDbPath, initDb as initIndexerDb } from '../dist/db.js';
+import { indexDetections, needsIndexing } from '../dist/indexer.js';
+import { fileURLToPath } from 'url';
 import { initPatternsSchema } from '../dist/db/patterns.js';
 import { existsSync } from 'fs';
 import { platform } from 'os';
@@ -65,6 +69,11 @@ test('DB path uses correct platform separators', () => {
   assert(dbPath.includes('security-detections-mcp'), 'DB path should contain project cache dir');
   assert(dbPath.endsWith('detections.sqlite'), 'DB path should end with detections.sqlite');
   console.log(`        Path: ${dbPath}`);
+});
+
+test('Both database entry points honor the isolated database path', () => {
+  assert(getDbPath() === process.env.DETECTIONS_DB_PATH, 'Modular DB must use the explicit path');
+  assert(getLegacyDbPath() === getDbPath(), 'Indexer and tools must use the same database');
 });
 
 test('Cache dir uses correct platform separators', () => {
@@ -208,6 +217,27 @@ test('Multiple close calls dont crash', () => {
 // =============================================================================
 // FINAL CLEANUP
 // =============================================================================
+
+test('Indexing closes existing query and indexer handles before replacing the database', () => {
+  const queryConnection = initDb();
+  const indexerConnection = initIndexerDb();
+  const fixturePath = fileURLToPath(new URL('./fixtures/jamf_protect', import.meta.url));
+  const result = indexDetections([], [], [], [], [], [], [], [fixturePath]);
+  assert(result.jamf_protect_indexed === 3, 'All fixture detections must be indexed');
+  assert(!queryConnection.open, 'The old query connection must be closed');
+  assert(!indexerConnection.open, 'The old indexer connection must be closed');
+  assert(getDb().prepare('SELECT COUNT(*) AS count FROM detections').get().count === 3,
+    'Reopened query connection must read the replacement database');
+  // Check indexDetections cleanup before needsIndexing can close a leaked handle.
+  recreateDb();
+});
+
+test('Index checks release their connection before a later database replacement', () => {
+  assert(needsIndexing(), 'The replacement database should be empty');
+  // needsIndexing must not leave a hidden handle that prevents this on Windows.
+  recreateDb();
+  assert(!dbExists(), 'No hidden connection should prevent database deletion');
+});
 
 test('Clean up test data', () => {
   recreateDb();

@@ -11,6 +11,7 @@
  * 6. Data normalization
  */
 
+import './indexed-db.js';
 import { initDb, getDb, dbExists } from '../dist/db/connection.js';
 import { getStats, listBySource, listByMitre, searchDetections, getDetectionById } from '../dist/db/detections.js';
 import { initPatternsSchema, getPatternStats, getPatternsByTechnique, getFieldReference, extractAllPatterns } from '../dist/db/patterns.js';
