@@ -103,7 +103,7 @@ program
     try {
       const { ctiAnalystNode } = await import('../nodes/cti-analyst.js');
       const { coverageAnalyzerNode } = await import('../nodes/coverage-analyzer.js');
-      const { v4: uuidv4 } = await import('uuid');
+      const { randomUUID } = await import('node:crypto');
 
       const state = {
         input_type: 'technique' as const,
@@ -114,7 +114,7 @@ program
         atomic_tests: [],
         attack_data_paths: [],
         prs: [],
-        workflow_id: uuidv4(),
+        workflow_id: randomUUID(),
         current_step: 'initialized',
         errors: [] as string[],
         warnings: [] as string[],
