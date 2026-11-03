@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setConfig, loadConfig, resetConfig } from '../../config.js';
 
-const MOCK_LLM_RESPONSE = `Here is the analysis:
-{
+const MOCK_LLM_RESPONSE = {
   "techniques": [
     {
       "id": "T1003.001",
@@ -19,14 +18,17 @@ const MOCK_LLM_RESPONSE = `Here is the analysis:
       "context": "PowerShell used for download cradle"
     }
   ]
-}`;
+};
 
-const mockInvoke = vi.fn().mockResolvedValue({ content: MOCK_LLM_RESPONSE });
+const mockInvoke = vi.fn();
+const mockWithStructuredOutput = vi.fn().mockImplementation(() => ({ invoke: mockInvoke }));
 
 vi.mock('@langchain/anthropic', () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({
-    invoke: mockInvoke,
-  })),
+  ChatAnthropic: vi.fn().mockImplementation(function () {
+    return {
+      withStructuredOutput: mockWithStructuredOutput,
+    };
+  }),
 }));
 
 // Static import so the mock is resolved before the module loads
@@ -37,8 +39,10 @@ describe('ctiAnalystNode', () => {
     resetConfig();
     const cfg = loadConfig();
     cfg.anthropicApiKey = 'test-key';
+    cfg.dryRun = false;
     setConfig(cfg);
-    mockInvoke.mockResolvedValue({ content: MOCK_LLM_RESPONSE });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(MOCK_LLM_RESPONSE);
   });
 
   it('extracts techniques from threat intel', async () => {
@@ -57,7 +61,9 @@ describe('ctiAnalystNode', () => {
 
     const result = await ctiAnalystNode(state);
 
-    expect(result.techniques).toBeDefined();
+    expect(mockWithStructuredOutput).toHaveBeenCalledOnce();
+    expect(mockInvoke).toHaveBeenCalledWith(expect.stringContaining(state.input_content));
+    expect(result.techniques).toEqual(MOCK_LLM_RESPONSE.techniques);
     expect(result.techniques!.length).toBe(2);
     expect(result.techniques![0].id).toBe('T1003.001');
     expect(result.techniques![1].id).toBe('T1059.001');
@@ -65,7 +71,7 @@ describe('ctiAnalystNode', () => {
   });
 
   it('handles empty LLM response gracefully', async () => {
-    mockInvoke.mockResolvedValueOnce({ content: 'No techniques found in this report.' });
+    mockInvoke.mockResolvedValueOnce({ techniques: [] });
 
     const state: any = {
       input_content: 'Nothing interesting here.',
@@ -75,6 +81,8 @@ describe('ctiAnalystNode', () => {
 
     const result = await ctiAnalystNode(state);
     expect(result.techniques).toEqual([]);
+    expect(result.current_step).toBe('cti_analysis_complete');
+    expect(result.errors).toBeUndefined();
   });
 
   it('handles LLM error gracefully', async () => {
@@ -90,5 +98,6 @@ describe('ctiAnalystNode', () => {
     expect(result.techniques).toEqual([]);
     expect(result.errors).toBeDefined();
     expect(result.errors![0]).toContain('rate limit');
+    expect(result.current_step).toBe('cti_analysis_failed');
   });
 });

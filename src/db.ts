@@ -1,11 +1,9 @@
 import Database from 'better-sqlite3';
-import { homedir, platform } from 'os';
-import { join } from 'path';
+import { platform } from 'os';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import type { Detection, IndexStats, AnalyticStory } from './types.js';
 
-const CACHE_DIR = join(homedir(), '.cache', 'security-detections-mcp');
-const DB_PATH = join(CACHE_DIR, 'detections.sqlite');
+import { CACHE_DIR, DB_PATH } from './db/paths.js';
 
 let db: Database.Database | null = null;
 
@@ -204,13 +202,18 @@ function safeUnlink(filePath: string, maxRetries = 5, delayMs = 100): void {
   }
 }
 
-// Force recreation of the database (needed when schema changes)
-// Handles Windows file locking with retry logic
-export function recreateDb(): void {
+// Close the legacy indexer's connection before test/automation cleanup.
+export function closeDb(): void {
   if (db) {
     db.close();
     db = null;
   }
+}
+
+// Force recreation of the database (needed when schema changes).
+// Handles Windows file locking with retry logic.
+export function recreateDb(): void {
+  closeDb();
 
   // Small delay on Windows to let file handles fully release
   if (platform() === 'win32') {

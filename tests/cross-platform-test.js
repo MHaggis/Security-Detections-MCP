@@ -13,7 +13,9 @@
  * 5. WAL/journal file cleanup
  */
 
+import './isolated-db.js';
 import { initDb, getDb, dbExists, recreateDb, closeDb, getDbPath, getCacheDir } from '../dist/db/connection.js';
+import { getDbPath as getLegacyDbPath } from '../dist/db.js';
 import { initPatternsSchema } from '../dist/db/patterns.js';
 import { existsSync } from 'fs';
 import { platform } from 'os';
@@ -65,6 +67,11 @@ test('DB path uses correct platform separators', () => {
   assert(dbPath.includes('security-detections-mcp'), 'DB path should contain project cache dir');
   assert(dbPath.endsWith('detections.sqlite'), 'DB path should end with detections.sqlite');
   console.log(`        Path: ${dbPath}`);
+});
+
+test('Both database entry points honor the isolated database path', () => {
+  assert(getDbPath() === process.env.DETECTIONS_DB_PATH, 'Modular DB must use the explicit path');
+  assert(getLegacyDbPath() === getDbPath(), 'Indexer and tools must use the same database');
 });
 
 test('Cache dir uses correct platform separators', () => {

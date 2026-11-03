@@ -120,6 +120,8 @@ export interface SplunkDetection {
   id: string;
   version?: number;
   date?: string;
+  creation_date?: string;
+  modification_date?: string;
   author?: string;
   status?: string;
   type?: string;
@@ -129,6 +131,12 @@ export interface SplunkDetection {
   how_to_implement?: string;
   known_false_positives?: string;
   references?: string[];
+  // Current security_content places metadata at the top level; older rules use tags.
+  analytic_story?: string[] | null;
+  asset_type?: string | null;
+  mitre_attack_id?: string[] | null;
+  security_domain?: string | null;
+  cve?: string[] | null;
   tags?: {
     analytic_story?: string[];
     asset_type?: string;

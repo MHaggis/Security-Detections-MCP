@@ -275,6 +275,15 @@ Pairs with [mitre-attack-mcp](https://github.com/MHaggis/mitre-attack-mcp) for c
 npm install && npm run build && npm test
 ```
 
+`npm test` builds a disposable SQLite index and requires `SIGMA_PATHS`,
+`SPLUNK_PATHS`, and `STORY_PATHS` to point to the cloned content described above.
+The database lifecycle and content tests never modify your normal user cache.
+For checks without external content, run `npm run test:platform`,
+`npm run test:jamf`, and `npm run test:mcp`.
+Set `DETECTIONS_DB_PATH` to select a separate database for server instances or
+automation; otherwise the normal `~/.cache/security-detections-mcp/detections.sqlite`
+location is used.
+
 ## Documentation
 
 - **[Setup Guide](./SETUP.md)** — Full install walkthrough for all platforms

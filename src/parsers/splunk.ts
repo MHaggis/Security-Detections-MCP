@@ -171,6 +171,12 @@ export function parseSplunkFile(filePath: string): Detection | null {
     if (!rule.search) {
       return null;
     }
+
+    // Current security_content flattened metadata previously nested under tags.
+    // Explicit top-level values (including empty/null values) override legacy tags.
+    const metadata = { ...rule.tags, ...rule };
+    const mitreIds = metadata.mitre_attack_id || [];
+    const analyticStories = metadata.analytic_story || [];
     
     const detection: Detection = {
       id: rule.id,
@@ -178,32 +184,32 @@ export function parseSplunkFile(filePath: string): Detection | null {
       description: rule.description || '',
       query: rule.search,
       source_type: 'splunk_escu',
-      mitre_ids: rule.tags?.mitre_attack_id || [],
+      mitre_ids: mitreIds,
       logsource_category: null,
       logsource_product: null,
       logsource_service: null,
       severity: null, // Could map from risk score if available
       status: rule.status || null,
       author: rule.author || null,
-      date_created: rule.date || null,
-      date_modified: null,
+      date_created: rule.creation_date ?? rule.date ?? null,
+      date_modified: rule.modification_date ?? null,
       references: rule.references || [],
       falsepositives: rule.known_false_positives ? [rule.known_false_positives] : [],
-      tags: rule.tags?.analytic_story || [],
+      tags: analyticStories,
       file_path: filePath,
       raw_yaml: content,
       
       // Enhanced fields
-      cves: rule.tags?.cve || [],
-      analytic_stories: rule.tags?.analytic_story || [],
+      cves: metadata.cve || [],
+      analytic_stories: analyticStories,
       data_sources: rule.data_source || [],
       detection_type: rule.type || null,
-      asset_type: rule.tags?.asset_type as string || null,
-      security_domain: rule.tags?.security_domain as string || null,
+      asset_type: metadata.asset_type || null,
+      security_domain: metadata.security_domain || null,
       process_names: extractProcessNames(rule.search),
       file_paths: extractFilePaths(rule.search),
       registry_paths: extractRegistryPaths(rule.search),
-      mitre_tactics: extractMitreTactics(rule.tags?.mitre_attack_id),
+      mitre_tactics: extractMitreTactics(mitreIds),
       platforms: [],
       kql_category: null,
       kql_tags: [],

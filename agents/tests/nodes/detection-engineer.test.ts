@@ -8,9 +8,10 @@ const tmpDir = join(tmpdir(), `det-eng-test-${Date.now()}`);
 
 // Mock the LLM to return a valid detection YAML
 vi.mock('@langchain/anthropic', () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({
-    invoke: vi.fn().mockResolvedValue({
-      content: `\`\`\`yaml
+  ChatAnthropic: vi.fn().mockImplementation(function () {
+    return {
+      invoke: vi.fn().mockResolvedValue({
+        content: `\`\`\`yaml
 name: Windows LSASS Memory Dump Via Procdump
 id: 00000000-0000-0000-0000-000000000001
 version: 1
@@ -31,8 +32,9 @@ tags:
   product:
   - Splunk Enterprise
 \`\`\``,
-    }),
-  })),
+      }),
+    };
+  }),
 }));
 
 describe('detectionEngineerNode', () => {

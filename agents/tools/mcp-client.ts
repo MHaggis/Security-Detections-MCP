@@ -11,6 +11,7 @@
  */
 
 import { getConfig } from '../config.js';
+import { existsSync } from 'node:fs';
 
 interface MCPToolCall {
   server: string;
@@ -34,11 +35,15 @@ async function loadDbModule(): Promise<any> {
   if (dbModule) return dbModule;
   
   try {
-    // Use dynamic import to load from parent directory at runtime
-    // This works because at runtime we're in dist/ and the parent dist/
-    // has the compiled db module
-    const modulePath = '../../dist/db/index.js';
-    dbModule = await import(modulePath);
+    // Source lives in agents/tools; compiled output lives in agents/dist/tools.
+    // Locate the agents package first so both entry points reach the sibling
+    // MCP server build, independently of the process working directory.
+    const parent = new URL('../', import.meta.url);
+    const packageRoot = existsSync(new URL('package.json', parent))
+      ? parent
+      : new URL('../', parent);
+    const moduleUrl = new URL('../dist/db/index.js', packageRoot);
+    dbModule = await import(moduleUrl.href);
     return dbModule;
   } catch (error) {
     console.log('[MCP Client] Could not load db module directly, will use MCP protocol');
