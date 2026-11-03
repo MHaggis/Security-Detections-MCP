@@ -228,9 +228,15 @@ test('Indexing closes existing query and indexer handles before replacing the da
   assert(!indexerConnection.open, 'The old indexer connection must be closed');
   assert(getDb().prepare('SELECT COUNT(*) AS count FROM detections').get().count === 3,
     'Reopened query connection must read the replacement database');
-  assert(!needsIndexing(), 'Index check must see fixture content');
+  // Check indexDetections cleanup before needsIndexing can close a leaked handle.
+  recreateDb();
+});
+
+test('Index checks release their connection before a later database replacement', () => {
+  assert(needsIndexing(), 'The replacement database should be empty');
   // needsIndexing must not leave a hidden handle that prevents this on Windows.
   recreateDb();
+  assert(!dbExists(), 'No hidden connection should prevent database deletion');
 });
 
 test('Clean up test data', () => {
