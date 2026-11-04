@@ -12,6 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        npm: [bundled, '11.12.0']
     steps:
       - uses: actions/checkout@v6
         with:
@@ -20,6 +21,11 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Match pinned publisher npm where selected
+        if: matrix.npm != 'bundled'
+        run: npm install --global npm@${{ matrix.npm }}
+      - name: Record release toolchain
+        run: node --version && npm --version
       - run: npm ci
       - run: npm run lint
       - run: npm run release:verify
