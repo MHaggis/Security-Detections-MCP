@@ -1,6 +1,6 @@
 # Security Detections MCP
 
-An MCP (Model Context Protocol) server that lets LLMs query a unified database of **Sigma**, **Splunk ESCU**, **Elastic**, **KQL**, **Sublime**, and **CrowdStrike CQL** security detection rules.
+An MCP (Model Context Protocol) server that lets LLMs query a unified database of **Sigma**, **Splunk ESCU**, **Elastic**, **KQL**, **Sublime** (Sublime Security and delivr.to), and **CrowdStrike CQL** security detection rules.
 
 > **New here? Start with the [Setup Guide](./SETUP.md)** -- covers macOS, Windows (WSL & native), and Linux step by step.
 >
@@ -149,7 +149,7 @@ Configure env vars to point at your detection repos:
 | `SPLUNK_PATHS` | Splunk ESCU detection directories |
 | `ELASTIC_PATHS` | Elastic detection rule directories |
 | `KQL_PATHS` | KQL hunting query directories |
-| `SUBLIME_PATHS` | Sublime Security rule directories |
+| `SUBLIME_PATHS` | Sublime MQL rule directories — Sublime Security and delivr.to (comma-separated) |
 | `CQL_HUB_PATHS` | CQL Hub (CrowdStrike) query directories |
 | `JAMF_PROTECT_PATHS` | Jamf Protect custom analytic detection directories (macOS) |
 | `STORY_PATHS` | Splunk analytic story directories (optional) |
@@ -169,6 +169,7 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/elastic/detec
 git clone --depth 1 https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules.git kql-bertjanp
 git clone --depth 1 https://github.com/jkerai1/KQL-Queries.git kql-jkerai1
 git clone --depth 1 --filter=blob:none --sparse https://github.com/sublime-security/sublime-rules.git && cd sublime-rules && git sparse-checkout set detection-rules && cd ..
+git clone --depth 1 --filter=blob:none --sparse https://github.com/delivr-to/detections.git delivr-detections && cd delivr-detections && git sparse-checkout set sublime-rules && cd ..
 git clone --depth 1 https://github.com/ByteRay-Labs/Query-Hub.git cql-hub
 ```
 
@@ -266,6 +267,7 @@ Pairs with [mitre-attack-mcp](https://github.com/MHaggis/mitre-attack-mcp) for c
 | Elastic Rules | ~1,500+ |
 | KQL Queries | ~420+ |
 | Sublime Rules | ~900+ |
+| delivr.to Sublime Rules | ~40+ |
 | CrowdStrike CQL | ~139+ |
 | **Total** | **~8,200+** |
 

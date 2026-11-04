@@ -1,0 +1,20 @@
+# Synthetic fixture in the shape of delivr-to/detections sublime-rules:
+# .yml extension, no `id`, twitter-only author, no attack_types/tactics.
+name: "Attachment: SVG File with Script Element"
+description: |
+  Synthetic test rule modelled on the delivr.to Sublime rule layout.
+type: "rule"
+severity: "medium"
+authors:
+  - twitter: "delivr_to"
+references:
+  - https://delivr.to/payloads?id=00000000-0000-0000-0000-000000000000
+source: |
+  type.inbound
+  and any(attachments,
+    .file_extension =~ "svg"
+    and any(file.explode(.), any(.scan.strings.strings, strings.ilike(., "*<script*")))
+  )
+
+tags:
+  - "Suspicious Attachment"
