@@ -30,3 +30,13 @@ The first live candidate (`v3.3.1`, run 41876314748) reached npm but failed befo
 REL-005 now also exercises the actual installed npm publish parser with `--dry-run --offline --ignore-scripts`, empty user/global npm configurations, an environment that excludes token/OIDC/application variables, and a loopback registry. It verifies package identity and unchanged original/copied SHA-256 bytes. Every Linux/Windows installed-package validation runs this check against its actual candidate tarball. A separate real-CLI regression uses lifecycle scripts that fail if executed and rejects a mismatched expected version.
 
 Verified locally with Node 24 / npm 11.12.0 against the exact retained failed-run tarball: version 3.3.1, SHA-256 `16241ddc7a0442d02c15e6608864f4ff7b73884c22dcf04cb1b9932f38e95bc5`. This is a dry-run parser check only; account OIDC authorization and successful publication still require a new live run after all required main checks.
+
+
+## Registry namespace correction
+
+Live run 41883470128 published npm 3.3.2 successfully, then Registry publication returned 403: GitHub OIDC authorized `io.github.MHaggis/*`, while the manifest requested lowercase `io.github.mhaggis/security-detections-mcp`. The registry's permission matcher compares the namespace case-sensitively. Package metadata, Registry metadata, verifier and artifact assertions now use the canonical `io.github.MHaggis/security-detections-mcp` exactly, and regression tests reject mutually consistent but incorrectly lowercased metadata. Published 3.3.2 cannot be rewritten; the next automatic patch carries corrected `mcpName`.
+
+Read-only preflight returned 404 for both casing variants and no search results, so no previous Registry entry was modified or replaced. Local Registry validation only checks schema; successful authenticated publication remains a distinct release gate. The observed OIDC error and [upstream issue #689](https://github.com/modelcontextprotocol/registry/issues/689) establish the exact owner casing requirement.
+
+
+The Registry job now fetches the exact published version directly from npm and compares its name, version and `mcpName` with the materialized server metadata before authenticating/publishing to the Registry. Missing, malformed, unavailable and incorrectly cased metadata fail closed. Read-only validation against actual npm 3.3.2 reproduces rejection of its immutable lowercase `mcpName`; fixture tests establish acceptance of corrected metadata. The new version's successful live gate remains required.

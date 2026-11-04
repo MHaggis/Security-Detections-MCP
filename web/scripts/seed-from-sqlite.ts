@@ -176,8 +176,24 @@ async function upsertBatch(table: string, rows: Record<string, unknown>[], batch
   if (!onConflict) throw new Error(`Missing conflict key for ${table}`);
 
   async function writeBatch(batch: Record<string, unknown>[], offset: number): Promise<void> {
-    const { error } = await supabase.from(table).upsert(batch, { onConflict });
-    if (!error) return;
+    const json = JSON.stringify(batch);
+    if (Buffer.byteLength(json, 'utf8') > 2 * 1024 * 1024) {
+      if (batch.length === 1) throw new Error(`${table} batch ${offset} failed: single row exceeds 2 MiB transport limit`);
+      const middle = Math.floor(batch.length / 2);
+      await writeBatch(batch.slice(0, middle), offset);
+      await writeBatch(batch.slice(middle), offset + middle);
+      return;
+    }
+    const { data, error } = await supabase.rpc('seed_catalog_batch', {
+      p_table: table,
+      p_payload: Buffer.from(json, 'utf8').toString('base64'),
+    });
+    if (!error) {
+      if (!data || data.processed !== batch.length) {
+        throw new Error(`${table} batch ${offset} failed: invalid catalog acknowledgement`);
+      }
+      return;
+    }
     if (error.code === '57014' && /statement timeout/i.test(error.message) && batch.length > 1) {
       const middle = Math.floor(batch.length / 2);
       console.warn(`${table} batch ${offset} canceled (57014); splitting ${batch.length} rows into ${middle} and ${batch.length - middle}`);
@@ -264,7 +280,7 @@ async function seedDetections() {
   }));
 
   const count = await upsertBatch('detections', mapped);
-  console.log(`  Inserted ${count} detections`);
+  console.log(`  Processed ${count} detections`);
 }
 
 async function seedTechniqueTactics() {
@@ -272,7 +288,7 @@ async function seedTechniqueTactics() {
   const rows = sqlite.prepare('SELECT * FROM technique_tactics').all() as Record<string, unknown>[];
   console.log(`  Found ${rows.length} rows`);
   const count = await upsertBatch('technique_tactics', rows);
-  console.log(`  Inserted ${count} rows`);
+  console.log(`  Processed ${count} rows`);
 }
 
 async function seedAttackTechniques() {
@@ -291,7 +307,7 @@ async function seedAttackTechniques() {
       url: row.url,
     }));
     const count = await upsertBatch('attack_techniques', mapped);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -310,7 +326,7 @@ async function seedAttackActors() {
       modified: row.modified,
     }));
     const count = await upsertBatch('attack_actors', mapped);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -328,7 +344,7 @@ async function seedAttackSoftware() {
       aliases: parseJsonSafe(row.aliases as string),
     }));
     const count = await upsertBatch('attack_software', mapped);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -338,7 +354,7 @@ async function seedActorTechniques() {
     const rows = optionalRows('actor_techniques');
     console.log(`  Found ${rows.length} rows`);
     const count = await upsertBatch('actor_techniques', rows);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -348,7 +364,7 @@ async function seedSoftwareTechniques() {
     const rows = optionalRows('software_techniques');
     console.log(`  Found ${rows.length} rows`);
     const count = await upsertBatch('software_techniques', rows);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -369,7 +385,7 @@ async function seedProcedureReference() {
       confidence: row.confidence,
     }));
     const count = await upsertBatch('procedure_reference', mapped);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 
@@ -393,7 +409,7 @@ async function seedStories() {
       detection_names: parseJsonSafe(row.detection_names as string),
     }));
     const count = await upsertBatch('stories', mapped);
-    console.log(`  Inserted ${count} rows`);
+    console.log(`  Processed ${count} rows`);
   }
 }
 

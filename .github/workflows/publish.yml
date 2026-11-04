@@ -106,6 +106,8 @@ jobs:
             sleep 5
           done
           exit 1
+      - name: Verify exact published npm identity and Registry namespace
+        run: node scripts/release/verify-published.mjs
       - name: Download pinned MCP publisher and verify archive
         env:
           MCP_PUBLISHER_VERSION: '1.8.1'
