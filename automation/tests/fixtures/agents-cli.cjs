@@ -3,6 +3,7 @@ const args = process.argv.slice(2);
 if (args[0] !== 'orchestrate' || args.includes('--no-approval')) process.exit(4);
 const input = fs.readFileSync(args[args.indexOf('--file') + 1], 'utf8');
 const scenario = process.env.TEST_SCENARIO || 'good';
+if (process.env.TEST_INVOCATIONS) fs.appendFileSync(process.env.TEST_INVOCATIONS, 'invoked\n');
 if (scenario === 'failure') { console.error('secret-like child output must not enter queue errors'); process.exit(2); }
 if (scenario === 'timeout') { setInterval(() => {}, 1000); return; }
 if (scenario === 'malformed') { console.log('Pipeline result saved to: detection-pipeline-result.json\nnot-json'); return; }

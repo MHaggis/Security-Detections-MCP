@@ -22,7 +22,7 @@ Dry-run output is `simulated`. Live output must stop at `awaiting_approval`, con
 
 The adapter is a boundary around an existing experimental pipeline; output checks do not independently establish the correctness of generated SPL, test effects, or export contents. A reviewer must inspect them. Persistent artifacts outside the temporary working directory survive cleanup. Structured results and review requests commit atomically with job/feed status.
 
-Transient failures increment attempts and stop at `max_retries` (default three). Configuration/evidence failures become `blocked` without consuming retries. This implementation deliberately has no automatic abandoned-job replay: live jobs can have external side effects. See the recovery procedure before restarting a job after a crash.
+Retryable dry-run and feed-collection failures increment attempts and stop at `max_retries` (default three). Any uncertain live invocation or failed persistence after a live result blocks without replay; external side effects require operator inspection. Configuration/evidence failures become `blocked` without consuming retries. This implementation deliberately has no automatic abandoned-job replay: live jobs can have external side effects. See the recovery procedure before restarting a job after a crash.
 
 Review transitions the persisted result to `reviewed` or `cancelled` and cannot queue another invocation. The agents CLI has no durable resume/checkpoint protocol, so approval does not stage PRs. A future publisher needs a separate reviewed contract and idempotent resume design.
 

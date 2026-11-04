@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, rmSync, writeFileSync, existsSync } = require('node:fs');
+const { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { openDatabase } = require('../dist/db.js');
@@ -187,4 +187,44 @@ test('human rejection cancels a stored live result and cannot rerun it', async t
     assert.equal(approvals.getApproval(pending.id).status, 'rejected');
     assert.equal(await loop.processNext(), false);
   } finally { approvals.close(); loop.close(); }
+});
+
+
+for (const scenario of ['failure', 'timeout', 'malformed', 'error']) {
+  test(`uncertain live ${scenario} blocks without replaying external work`, async t => {
+    const f = setup(t);
+    const invocations = join(f.dir, 'invocations.txt');
+    const loop = new AutonomousLoop(f.path, createAgentsAdapter({
+      cliPath, mode: 'live', timeoutMs: scenario === 'timeout' ? 1000 : 5000,
+      env: { ...livePaths, ANTHROPIC_API_KEY: 'fixture-only', TEST_SCENARIO: scenario, TEST_INVOCATIONS: invocations },
+    }));
+    try {
+      await loop.processNext();
+      assert.equal(f.job().status, 'blocked');
+      assert.equal(f.feed().status, 'blocked');
+      assert.equal(f.job().retry_count, 0);
+      assert.equal(await loop.processNext(), false);
+      assert.equal(readFileSync(invocations, 'utf8'), 'invoked\n');
+    } finally { loop.close(); }
+  });
+}
+
+test('failed persistence after a live result blocks instead of rerunning the child', async t => {
+  const f = setup(t);
+  const artifact = join(f.dir, 'detection.yml');
+  const invocations = join(f.dir, 'invocations.txt');
+  writeFileSync(artifact, 'name: Synthetic detection');
+  f.db.exec("CREATE TRIGGER reject_approval BEFORE INSERT ON approval_requests BEGIN SELECT RAISE(ABORT, 'controlled persistence failure'); END");
+  const loop = new AutonomousLoop(f.path, createAgentsAdapter({ cliPath, mode: 'live',
+    env: { ...livePaths, ANTHROPIC_API_KEY: 'fixture-only', TEST_ARTIFACT: artifact, TEST_INVOCATIONS: invocations } }));
+  try {
+    await loop.processNext();
+    assert.equal(f.job().status, 'blocked');
+    assert.equal(f.feed().status, 'blocked');
+    assert.equal(f.job().retry_count, 0);
+    assert.equal(f.job().result, null);
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM approval_requests').get().n, 0);
+    assert.equal(await loop.processNext(), false);
+    assert.equal(readFileSync(invocations, 'utf8'), 'invoked\n');
+  } finally { loop.close(); }
 });

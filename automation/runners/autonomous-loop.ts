@@ -41,6 +41,7 @@ export class AutonomousLoop {
 
   async processJob(job: Job): Promise<boolean> {
     if (!this.claim(job.id)) return false;
+    let liveResultReceived = false;
     try {
       if (job.job_type === 'feed_collection') {
         if (process.env.AUTOMATION_MODE !== 'live') throw new BlockedError('Scheduled feed collection requires AUTOMATION_MODE=live');
@@ -60,10 +61,11 @@ export class AutonomousLoop {
       const feed = this.db.prepare('SELECT * FROM feed_items WHERE id=? AND job_id=?').get(payload.feed_item_id, job.id) as FeedItem | undefined;
       if (!feed) throw new Error('Linked feed item not found');
       const result = await this.orchestrate(feed);
+      liveResultReceived = result.mode === 'live';
       if (result.status !== 'simulated' && result.status !== 'awaiting_approval') throw new Error('Adapter returned unsupported completion status');
       this.persistResult(job.id, result);
     } catch (error) {
-      const blocked = error instanceof BlockedError;
+      const blocked = error instanceof BlockedError || liveResultReceived;
       const message = error instanceof Error ? error.message : 'Unknown processing error';
       this.db.transaction(() => {
         this.db.prepare(`UPDATE jobs SET

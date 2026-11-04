@@ -21,7 +21,7 @@ Before retrying a `running`, `blocked`, or `failed` job:
 3. Inspect the job's error/result, artifact paths, and external range state. Resolve the cause and decide whether replay is safe. A partial live invocation may already have written files or executed tests.
 4. Only then, in one SQLite transaction, reset that specific job to `pending`, clear `error`/`result`, set `retry_count=0`, clear `started_at`/`completed_at`, and update the linked feed state to `pending`. Never reset a reviewed result to rerun publication.
 
-There is intentionally no automatic lease expiry/replay. Review expiry is also explicit (`approvals -- check-expired`) and cancels the job; it never grants approval on timeout.
+Failed or unreadable live invocations and failed persistence of live results become `blocked`; they are never automatically retried. There is intentionally no automatic lease expiry/replay. Review expiry is also explicit (`approvals -- check-expired`) and cancels the job; it never grants approval on timeout.
 
 ## Existing installations
 

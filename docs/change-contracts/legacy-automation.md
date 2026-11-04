@@ -21,7 +21,7 @@ The production seam is `agents/dist/src/cli.js orchestrate --type threat_report 
 
 ## Stop rules and constraints
 
-No live credentials, cloud/range operations, continuous scheduler, or PR/notification side effects are needed to validate this slice. Live mode requires explicit configuration, persistent artifacts, and passing structured evidence. Missing coverage evidence is blocked. Crashed live jobs require operator inspection before any replay. Do not turn fixture evidence into claims of production security validation.
+No live credentials, cloud/range operations, continuous scheduler, or PR/notification side effects are needed to validate this slice. Live mode requires explicit configuration, persistent artifacts, and passing structured evidence. Missing coverage evidence is blocked. Crashed live jobs, uncertain live subprocess failures, and failed persistence after live results require operator inspection before any replay. Do not turn fixture evidence into claims of production security validation.
 
 ## Release evidence
 

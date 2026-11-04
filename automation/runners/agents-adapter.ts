@@ -80,7 +80,7 @@ export function createAgentsAdapter(options: AdapterOptions = {}): (feed: FeedIt
   const mode = options.mode ?? (env.AUTOMATION_MODE || 'disabled');
   const cliPath = resolve(options.cliPath ?? env.AGENTS_CLI_PATH ?? join(__dirname, '../../../agents/dist/src/cli.js'));
   const timeout = options.timeoutMs ?? 30 * 60 * 1000;
-  return async (feed) => {
+  const invoke = async (feed: FeedItem): Promise<AdapterResult> => {
     if (mode !== 'dry-run' && mode !== 'live') throw new BlockedError('Set AUTOMATION_MODE=dry-run or explicitly opt into live mode');
     if (!existsSync(cliPath)) throw new BlockedError('Agents CLI is missing; install and build agents/ or set AGENTS_CLI_PATH');
     if (mode === 'live' && !env.ANTHROPIC_API_KEY) throw new BlockedError('Live mode requires ANTHROPIC_API_KEY; mock fallback is not accepted');
@@ -130,6 +130,17 @@ export function createAgentsAdapter(options: AdapterOptions = {}): (feed: FeedIt
       return result;
     } finally {
       rmSync(workspace, { recursive: true, force: true });
+    }
+  };
+  return async (feed) => {
+    try { return await invoke(feed); }
+    catch (error) {
+      // A live child may have run range tests or written persistent artifacts before
+      // exiting, returning malformed evidence, or failing cleanup. Never replay it.
+      if (mode === 'live' && !(error instanceof BlockedError)) {
+        throw new BlockedError('Live invocation failed or produced unreadable evidence; inspect external state before retrying');
+      }
+      throw error;
     }
   };
 }
