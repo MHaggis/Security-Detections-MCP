@@ -1,3 +1,4 @@
+import { migrateDetectionIdentity } from './identity.js';
 /**
  * Database Schema Module
  * 
@@ -12,17 +13,30 @@ import type Database from 'better-sqlite3';
  * Called once during database initialization.
  */
 export function createSchema(db: Database.Database): void {
-  createDetectionsTable(db);
-  createDetectionsFts(db);
-  createDetectionsTriggers(db);
-  createDetectionsIndexes(db);
-  createStoriesTable(db);
-  createStoriesFts(db);
-  createStoriesTriggers(db);
-  createStoriesIndexes(db);
-  createProcedureReferenceTable(db);
-  createJunctionTables(db);
-  createAttackTables(db);
+  const foreignKeys = db.pragma('foreign_keys', { simple: true });
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      const migrated = migrateDetectionIdentity(db);
+      createDetectionsTable(db);
+      createDetectionsFts(db);
+      createDetectionsTriggers(db);
+      createDetectionsIndexes(db);
+      createStoriesTable(db);
+      createStoriesFts(db);
+      createStoriesTriggers(db);
+      createStoriesIndexes(db);
+      createProcedureReferenceTable(db);
+      createJunctionTables(db);
+      createDetectionEdgeTriggers(db);
+      createAttackTables(db);
+      if (migrated) db.exec("INSERT INTO detections_fts(detections_fts) VALUES ('rebuild')");
+      const violations = db.pragma('foreign_key_check') as unknown[];
+      if (violations.length) throw new Error('Detection identity migration failed foreign key validation');
+    })();
+  } finally {
+    db.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+  }
 }
 
 /**
@@ -31,7 +45,7 @@ export function createSchema(db: Database.Database): void {
 function createDetectionsTable(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS detections (
-      id TEXT PRIMARY KEY,
+      id TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
       query TEXT,
@@ -66,7 +80,8 @@ function createDetectionsTable(db: Database.Database): void {
       kql_keywords TEXT,
       sublime_attack_types TEXT,
       sublime_detection_methods TEXT,
-      sublime_tactics TEXT
+      sublime_tactics TEXT,
+      PRIMARY KEY (source_type, id)
     )
   `);
 }
@@ -138,6 +153,7 @@ function createDetectionsTriggers(db: Database.Database): void {
  * Create indexes for common detection queries.
  */
 function createDetectionsIndexes(db: Database.Database): void {
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_detection_id ON detections(id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_source_type ON detections(source_type)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_severity ON detections(severity)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_logsource_product ON detections(logsource_product)`);
@@ -268,9 +284,11 @@ function createJunctionTables(db: Database.Database): void {
   // Detection → Technique many-to-many
   db.exec(`
     CREATE TABLE IF NOT EXISTS detection_techniques (
+      source_type TEXT NOT NULL,
       detection_id TEXT NOT NULL,
       technique_id TEXT NOT NULL,
-      PRIMARY KEY (detection_id, technique_id)
+      PRIMARY KEY (source_type, detection_id, technique_id),
+      FOREIGN KEY (source_type, detection_id) REFERENCES detections(source_type, id) ON DELETE CASCADE ON UPDATE CASCADE
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_dt_technique ON detection_techniques(technique_id)`);
@@ -354,4 +372,16 @@ function createAttackTables(db: Database.Database): void {
       PRIMARY KEY (software_id, technique_id)
     )
   `);
+}
+
+/** Keep technique links exact even when callers use the legacy insertion API. */
+function createDetectionEdgeTriggers(db: Database.Database): void {
+  for (const event of ['INSERT', 'UPDATE'] as const) {
+    db.exec(`CREATE TRIGGER IF NOT EXISTS detections_edges_${event.toLowerCase()}
+      AFTER ${event} ON detections BEGIN
+      DELETE FROM detection_techniques WHERE source_type = NEW.source_type AND detection_id = NEW.id;
+      INSERT OR IGNORE INTO detection_techniques(source_type, detection_id, technique_id)
+        SELECT NEW.source_type, NEW.id, value FROM json_each(COALESCE(NEW.mitre_ids, '[]')) WHERE type = 'text';
+      END`);
+  }
 }

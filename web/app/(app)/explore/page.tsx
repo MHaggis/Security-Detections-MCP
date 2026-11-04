@@ -125,8 +125,8 @@ export default async function ExplorePage({
       <div className="grid gap-3">
         {detections?.map((d) => (
           <Link
-            key={d.id}
-            href={`/explore/${encodeURIComponent(d.id)}`}
+            key={JSON.stringify([d.source_type, d.id])}
+            href={`/explore/${encodeURIComponent(d.id)}?source_type=${encodeURIComponent(d.source_type)}`}
             className="bg-card hover:bg-card2 border border-border hover:border-border-bright rounded-[var(--radius-card)] p-4 transition-all group block"
           >
             <div className="flex items-start justify-between gap-4">

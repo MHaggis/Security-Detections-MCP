@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setConfig, loadConfig, resetConfig } from '../../config.js';
 
@@ -21,7 +22,7 @@ const MOCK_LLM_RESPONSE = {
 };
 
 const mockInvoke = vi.fn();
-const mockWithStructuredOutput = vi.fn().mockImplementation(() => ({ invoke: mockInvoke }));
+const mockWithStructuredOutput = vi.fn().mockImplementation((_schema: z.ZodType) => ({ invoke: mockInvoke }));
 
 vi.mock('@langchain/anthropic', () => ({
   ChatAnthropic: vi.fn().mockImplementation(function () {
@@ -68,6 +69,17 @@ describe('ctiAnalystNode', () => {
     expect(result.techniques![0].id).toBe('T1003.001');
     expect(result.techniques![1].id).toBe('T1059.001');
     expect(result.current_step).toBe('cti_analysis_complete');
+  });
+
+  it('DEP-002: structured schema preserves fields and rejects invalid confidence', async () => {
+    await ctiAnalystNode({ input_content: 'test content', techniques: [], errors: [] } as any);
+    const schema = mockWithStructuredOutput.mock.calls[0][0];
+    expect(schema.parse(MOCK_LLM_RESPONSE)).toEqual(MOCK_LLM_RESPONSE);
+    for (const confidence of [-0.1, 1.1, 'high']) {
+      expect(schema.safeParse({ techniques: [{ ...MOCK_LLM_RESPONSE.techniques[0], confidence }] }).success).toBe(false);
+    }
+    expect(schema.safeParse({ techniques: [{ id: 'T1003.001' }] }).success).toBe(false);
+    expect(schema.parse({ techniques: [] })).toEqual({ techniques: [] });
   });
 
   it('handles empty LLM response gracefully', async () => {

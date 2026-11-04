@@ -4,19 +4,39 @@ import { notFound } from 'next/navigation';
 
 export default async function DetectionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ source_type?: string }>;
 }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: detection } = await supabase
-    .from('detections')
-    .select('*')
-    .eq('id', decodeURIComponent(id))
-    .single();
-
-  if (!detection) notFound();
+  const { source_type } = await searchParams;
+  let query = supabase.from('detections').select('*').eq('id', id);
+  if (source_type) query = query.eq('source_type', source_type);
+  const { data: matches, error } = await query.order('source_type');
+  if (error) throw new Error(`Could not load detection: ${error.message}`);
+  if (!matches?.length) notFound();
+  if (matches.length > 1) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Link href="/explore">&larr; Back to Explore</Link>
+        <h1 className="text-2xl mt-6 mb-4">Choose a detection source</h1>
+        <p>This ID appears in multiple sources. Select the rule you want to view.</p>
+        <ul className="mt-4 space-y-3">
+          {matches.map(row => (
+            <li key={row.source_type}>
+              <Link className="text-blue hover:underline" href={`/explore/${encodeURIComponent(id)}?source_type=${encodeURIComponent(row.source_type)}`}>
+                {row.source_type}: {row.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  const detection = matches[0];
 
   const mitreIds = (detection.mitre_ids as string[]) || [];
   const mitreTactics = (detection.mitre_tactics as string[]) || [];

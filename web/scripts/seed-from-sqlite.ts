@@ -16,7 +16,7 @@ import { config } from 'dotenv';
 // Load .env.local
 config({ path: join(import.meta.dirname, '..', '.env.local') });
 
-const SQLITE_PATH = join(homedir(), '.cache', 'security-detections-mcp', 'detections.sqlite');
+const SQLITE_PATH = process.env.DETECTIONS_DB_PATH || join(homedir(), '.cache', 'security-detections-mcp', 'detections.sqlite');
 
 if (!existsSync(SQLITE_PATH)) {
   console.error(`SQLite database not found at ${SQLITE_PATH}`);
@@ -52,7 +52,7 @@ async function main() {
     syncRunId = await startSyncRun(preRunDetections);
 
     await seedDetections();
-    await seedDetectionTechniques();
+    // The database trigger reconciles technique edges atomically with each detection batch.
     await seedTechniqueTactics();
     await seedAttackTechniques();
     await seedAttackActors();
@@ -160,26 +160,30 @@ function formatSyncError(err: unknown): string {
   return message.slice(0, MAX_SYNC_ERROR_CHARS);
 }
 
+const CONFLICT_KEYS: Record<string, string> = {
+  detections: 'source_type,id', technique_tactics: 'technique_id,tactic_name',
+  attack_techniques: 'technique_id', attack_actors: 'actor_id', attack_software: 'software_id',
+  actor_techniques: 'actor_id,technique_id', software_techniques: 'software_id,technique_id',
+  procedure_reference: 'id', stories: 'id',
+};
+
 async function upsertBatch(table: string, rows: Record<string, unknown>[], batchSize = 500) {
-  let inserted = 0;
+  const onConflict = CONFLICT_KEYS[table];
+  if (!onConflict) throw new Error(`Missing conflict key for ${table}`);
   for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    const { error } = await supabase.from(table).upsert(batch, { onConflict: 'id' });
-    if (error) {
-      // Try with ignoreDuplicates for tables without 'id' column
-      const { error: error2 } = await supabase.from(table).upsert(batch);
-      if (error2) {
-        console.error(`  Error in ${table} batch ${i}: ${error2.message}`);
-        continue;
-      }
-    }
-    inserted += batch.length;
-    if (rows.length > batchSize) {
-      process.stdout.write(`\r  ${inserted}/${rows.length}`);
-    }
+    const { error } = await supabase.from(table).upsert(rows.slice(i, i + batchSize), { onConflict });
+    if (error) throw new Error(`${table} batch ${i} failed: ${error.message}`);
   }
-  if (rows.length > batchSize) process.stdout.write('\n');
-  return inserted;
+  return rows.length;
+}
+
+function optionalRows(table: string): Record<string, unknown>[] {
+  const exists = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table);
+  if (!exists) {
+    console.log(`  ${table} not present in SQLite, skipping`);
+    return [];
+  }
+  return sqlite.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[];
 }
 
 function parseJsonSafe(val: string | null): unknown {
@@ -189,6 +193,14 @@ function parseJsonSafe(val: string | null): unknown {
   } catch {
     return [];
   }
+}
+
+function parseTechniqueIds(value: unknown): string[] {
+  const parsed: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed) || parsed.some(id => typeof id !== 'string' || !id)) {
+    throw new Error('Invalid mitre_ids in SQLite; refusing to erase technique edges');
+  }
+  return parsed;
 }
 
 async function seedDetections() {
@@ -202,7 +214,7 @@ async function seedDetections() {
     description: row.description,
     query: row.query,
     source_type: row.source_type,
-    mitre_ids: parseJsonSafe(row.mitre_ids as string),
+    mitre_ids: parseTechniqueIds(row.mitre_ids),
     mitre_tactics: parseJsonSafe(row.mitre_tactics as string),
     severity: row.severity,
     author: row.author,
@@ -238,14 +250,6 @@ async function seedDetections() {
   console.log(`  Inserted ${count} detections`);
 }
 
-async function seedDetectionTechniques() {
-  console.log('Seeding detection_techniques...');
-  const rows = sqlite.prepare('SELECT * FROM detection_techniques').all() as Record<string, unknown>[];
-  console.log(`  Found ${rows.length} rows`);
-  const count = await upsertBatch('detection_techniques', rows);
-  console.log(`  Inserted ${count} rows`);
-}
-
 async function seedTechniqueTactics() {
   console.log('Seeding technique_tactics...');
   const rows = sqlite.prepare('SELECT * FROM technique_tactics').all() as Record<string, unknown>[];
@@ -256,8 +260,8 @@ async function seedTechniqueTactics() {
 
 async function seedAttackTechniques() {
   console.log('Seeding attack_techniques...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM attack_techniques').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('attack_techniques');
     console.log(`  Found ${rows.length} rows`);
     const mapped = rows.map(row => ({
       technique_id: row.technique_id,
@@ -271,15 +275,13 @@ async function seedAttackTechniques() {
     }));
     const count = await upsertBatch('attack_techniques', mapped);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite (STIX not loaded), skipping');
   }
 }
 
 async function seedAttackActors() {
   console.log('Seeding attack_actors...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM attack_actors').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('attack_actors');
     console.log(`  Found ${rows.length} rows`);
     const mapped = rows.map(row => ({
       actor_id: row.actor_id,
@@ -292,15 +294,13 @@ async function seedAttackActors() {
     }));
     const count = await upsertBatch('attack_actors', mapped);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite (STIX not loaded), skipping');
   }
 }
 
 async function seedAttackSoftware() {
   console.log('Seeding attack_software...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM attack_software').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('attack_software');
     console.log(`  Found ${rows.length} rows`);
     const mapped = rows.map(row => ({
       software_id: row.software_id,
@@ -312,39 +312,33 @@ async function seedAttackSoftware() {
     }));
     const count = await upsertBatch('attack_software', mapped);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite (STIX not loaded), skipping');
   }
 }
 
 async function seedActorTechniques() {
   console.log('Seeding actor_techniques...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM actor_techniques').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('actor_techniques');
     console.log(`  Found ${rows.length} rows`);
     const count = await upsertBatch('actor_techniques', rows);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite, skipping');
   }
 }
 
 async function seedSoftwareTechniques() {
   console.log('Seeding software_techniques...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM software_techniques').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('software_techniques');
     console.log(`  Found ${rows.length} rows`);
     const count = await upsertBatch('software_techniques', rows);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite, skipping');
   }
 }
 
 async function seedProcedureReference() {
   console.log('Seeding procedure_reference...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM procedure_reference').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('procedure_reference');
     console.log(`  Found ${rows.length} rows`);
     const mapped = rows.map(row => ({
       id: row.id,
@@ -359,15 +353,13 @@ async function seedProcedureReference() {
     }));
     const count = await upsertBatch('procedure_reference', mapped);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite, skipping');
   }
 }
 
 async function seedStories() {
   console.log('Seeding stories...');
-  try {
-    const rows = sqlite.prepare('SELECT * FROM stories').all() as Record<string, unknown>[];
+  {
+    const rows = optionalRows('stories');
     console.log(`  Found ${rows.length} rows`);
     const mapped = rows.map(row => ({
       id: row.id,
@@ -385,8 +377,6 @@ async function seedStories() {
     }));
     const count = await upsertBatch('stories', mapped);
     console.log(`  Inserted ${count} rows`);
-  } catch (e) {
-    console.log('  Table not found in SQLite, skipping');
   }
 }
 

@@ -71,6 +71,7 @@ describe('detectionEngineerNode', () => {
     expect(result.detections!.length).toBe(1);
     expect(result.detections![0].technique_id).toBe('T1003.001');
     expect(result.detections![0].status).toBe('draft');
+    expect(result.detections![0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 
     // file should exist on disk
     const filePath = result.detections![0].file_path;

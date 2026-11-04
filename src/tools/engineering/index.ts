@@ -227,10 +227,11 @@ const findSimilarDetectionsTool = defineTool({
     if (techniqueId) {
       const techniqueMatches = listByMitre(techniqueId, limit);
       // Merge and dedupe
-      const ids = new Set(results.map(r => r.id));
+      const ids = new Set(results.map(r => JSON.stringify([r.source_type, r.id])));
       for (const tm of techniqueMatches) {
-        if (!ids.has(tm.id)) {
+        if (!ids.has(JSON.stringify([tm.source_type, tm.id]))) {
           results.push(tm);
+          ids.add(JSON.stringify([tm.source_type, tm.id]));
         }
       }
     }
@@ -256,6 +257,7 @@ const findSimilarDetectionsTool = defineTool({
       similar_detections: results.map(d => ({
         name: d.name,
         id: d.id,
+        source_type: d.source_type,
         description: d.description?.substring(0, 200),
         mitre_ids: d.mitre_ids,
         severity: d.severity,
@@ -267,7 +269,7 @@ const findSimilarDetectionsTool = defineTool({
           length: d.query?.length || 0,
         },
       })),
-      recommendation: 'Use get_raw_yaml(id) to see the full detection YAML for any of these.',
+      recommendation: 'Use get_raw_yaml(id, source_type) to see the full detection YAML for any of these.',
     };
   },
 });

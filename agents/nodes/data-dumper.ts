@@ -7,7 +7,7 @@
 
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { getMCPClient, splunkExportDump } from '../tools/mcp-client.js';
 import { getConfig } from '../config.js';
 import type { PipelineState, Detection } from '../state/types.js';
@@ -129,7 +129,7 @@ function generateDatasetYaml(
     }));
   
   const yaml = `author: Autonomous Detection Agent
-id: ${uuidv4()}
+id: ${randomUUID()}
 date: '${today}'
 description: |
   Validated attack data for detection: ${detection.name}

@@ -71,26 +71,20 @@ export async function searchDetections(query: string, limit = 50, sourceType?: s
   return (data as DetectionRow[]) ?? [];
 }
 
-export async function getDetectionById(id: string): Promise<Record<string, unknown> | null> {
-  const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('detections')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+export async function getDetectionById(id: string, sourceType?: string): Promise<Record<string, unknown> | null> {
+  let query = getServiceClient().from('detections').select('*').eq('id', id);
+  if (sourceType) query = query.eq('source_type', sourceType);
+  const { data, error } = await query.order('source_type');
   if (error) throw new Error(`getDetectionById: ${error.message}`);
-  return data;
+  if (data && data.length > 1) {
+    throw new Error(`Ambiguous detection ID ${id}. Specify source_type: ${data.map(row => row.source_type).join(', ')}`);
+  }
+  return data?.[0] ?? null;
 }
 
-export async function getRawYaml(id: string): Promise<string | null> {
-  const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('detections')
-    .select('raw_yaml')
-    .eq('id', id)
-    .maybeSingle();
-  if (error) throw new Error(`getRawYaml: ${error.message}`);
-  return (data?.raw_yaml as string | undefined) ?? null;
+export async function getRawYaml(id: string, sourceType?: string): Promise<string | null> {
+  const row = await getDetectionById(id, sourceType);
+  return (row?.raw_yaml as string | undefined) ?? null;
 }
 
 export async function listDetections(limit = 100, offset = 0, sourceType?: string): Promise<DetectionRow[]> {
@@ -193,20 +187,10 @@ export async function listByDetectionType(detectionType: string, limit = 50): Pr
 
 export async function listByMitre(techniqueId: string, limit = 50): Promise<DetectionRow[]> {
   const supabase = getServiceClient();
-  // Use the junction table so we catch every detection that references the technique.
-  const { data: ids, error: junctionError } = await supabase
-    .from('detection_techniques')
-    .select('detection_id')
-    .eq('technique_id', techniqueId)
-    .limit(500);
-  if (junctionError) throw new Error(`listByMitre (junction): ${junctionError.message}`);
-  if (!ids || ids.length === 0) return [];
-
-  const detectionIds = ids.map((row) => row.detection_id as string);
   const { data, error } = await supabase
     .from('detections')
     .select(DETECTION_LIST_COLUMNS)
-    .in('id', detectionIds)
+    .contains('mitre_ids', JSON.stringify([techniqueId]))
     .order('name')
     .limit(Math.min(limit, 100));
   if (error) throw new Error(`listByMitre: ${error.message}`);
@@ -219,7 +203,7 @@ export async function listByMitreTactic(tactic: string, limit = 50): Promise<Det
   const { data, error } = await supabase
     .from('detections')
     .select(DETECTION_LIST_COLUMNS)
-    .contains('mitre_tactics', [tactic])
+    .contains('mitre_tactics', JSON.stringify([tactic]))
     .order('name')
     .limit(Math.min(limit, 100));
   if (error) throw new Error(`listByMitreTactic: ${error.message}`);
@@ -246,7 +230,7 @@ export async function listByAnalyticStory(storyName: string, limit = 50): Promis
   const { data, error } = await supabase
     .from('detections')
     .select(DETECTION_LIST_COLUMNS)
-    .contains('analytic_stories', [storyName])
+    .contains('analytic_stories', JSON.stringify([storyName]))
     .order('name')
     .limit(Math.min(limit, 100));
   if (error) throw new Error(`listByAnalyticStory: ${error.message}`);

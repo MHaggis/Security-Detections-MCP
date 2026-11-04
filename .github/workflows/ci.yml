@@ -64,6 +64,9 @@ jobs:
       - name: Run cross-platform database tests
         run: node tests/cross-platform-test.js
 
+      - name: Verify source-qualified identity and legacy migration
+        run: node tests/source-identity-test.js
+
       - name: Run parser fixture tests
         shell: bash
         run: |
@@ -187,4 +190,19 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
+      - run: npm run test:http
+
+  catalog-postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - name: Verify real PostgreSQL and PostgREST catalog identity
+        run: node --experimental-strip-types web/tests/source-identity.integration.mjs

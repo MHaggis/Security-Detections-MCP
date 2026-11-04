@@ -78,6 +78,7 @@ export const searchTools = [
     inputSchema: {
       type: 'object',
       properties: {
+        source_type: { type: 'string', description: 'Source format; required when an ID appears in multiple sources' },
         id: {
           type: 'string',
           description: 'Detection ID (UUID for Sigma, or Splunk detection ID)',
@@ -97,7 +98,7 @@ export const searchTools = [
         };
       }
 
-      const detection = getDetectionById(id);
+      const detection = getDetectionById(id, args.source_type as string | undefined);
       if (!detection) {
         return {
           error: true,
@@ -121,6 +122,7 @@ export const searchTools = [
     inputSchema: {
       type: 'object',
       properties: {
+        source_type: { type: 'string', description: 'Source format; required when an ID appears in multiple sources' },
         id: {
           type: 'string',
           description: 'Detection ID',
@@ -135,7 +137,7 @@ export const searchTools = [
         return { error: true, message: 'id is required' };
       }
 
-      const yaml = getRawYaml(id);
+      const yaml = getRawYaml(id, args.source_type as string | undefined);
       if (!yaml) {
         return { error: true, message: `Detection not found: ${id}` };
       }

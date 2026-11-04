@@ -17,7 +17,7 @@
  */
 
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import {
   searchDetections,
   getDetectionById,
@@ -122,11 +122,11 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Search Detections',
       description:
         'Full-text search across all detection rules (name, description, query). Supports multi-word AND queries. Returns up to 50 detections by default.',
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).describe('Search query (words are AND-combined)'),
         limit: z.number().int().min(1).max(100).optional().describe('Max results (default 50)'),
         source_type: SOURCE_ENUM.optional().describe('Filter by detection source'),
-      },
+      }),
       annotations: { title: 'Search Detections', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -149,15 +149,16 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'Get Detection by ID',
       description: 'Get full details for a single detection by its ID (Sigma UUID or Splunk/Elastic slug).',
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Detection ID'),
-      },
+        source_type: SOURCE_ENUM.optional().describe('Source format; required when an ID occurs in multiple sources'),
+      }),
       annotations: { title: 'Get Detection by ID', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
-    async ({ id }) =>
+    async ({ id, source_type }) =>
       safe('get_by_id', async () => {
-        const detection = await getDetectionById(id);
+        const detection = await getDetectionById(id, source_type);
         if (!detection) return err(`Detection not found: ${id}`, { hint: 'Use search() first to find valid IDs.' });
         return json(detection);
       }),
@@ -168,15 +169,16 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'Get Raw YAML',
       description: 'Get the original YAML content for a detection (useful for copying the rule verbatim).',
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Detection ID'),
-      },
+        source_type: SOURCE_ENUM.optional().describe('Source format; required when an ID occurs in multiple sources'),
+      }),
       annotations: { title: 'Get Raw YAML', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
-    async ({ id }) =>
+    async ({ id, source_type }) =>
       safe('get_raw_yaml', async () => {
-        const yaml = await getRawYaml(id);
+        const yaml = await getRawYaml(id, source_type);
         if (!yaml) return err(`No raw YAML found for: ${id}`);
         return json({ id, yaml });
       }),
@@ -187,11 +189,11 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List Detections',
       description: 'List detections with pagination. Prefer search() or list_by_* filters for targeted queries.',
-      inputSchema: {
+      inputSchema: z.object({
         limit: z.number().int().min(1).max(100).optional().describe('Max results (default 50, hard cap 100)'),
         offset: z.number().int().min(0).optional().describe('Offset for pagination'),
         source_type: SOURCE_ENUM.optional(),
-      },
+      }),
       annotations: { title: 'List Detections', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -209,7 +211,7 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'Get Detection Stats',
       description: 'Get summary statistics about the indexed detection corpus (total detections, per-source counts, last sync).',
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { title: 'Get Detection Stats', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -222,7 +224,7 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Coverage Summary',
       description:
         'Get overall MITRE ATT&CK coverage summary — total techniques, covered techniques, coverage %, breakdowns by source and tactic, weakest/strongest tactics.',
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { title: 'Coverage Summary', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -234,7 +236,7 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'Analyze Coverage',
       description: 'Alias for get_coverage_summary — returns the same comprehensive coverage report.',
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { title: 'Analyze Coverage', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -247,9 +249,9 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Identify Detection Gaps',
       description:
         'Identify detection gaps for a specific threat profile (ransomware, apt, initial-access, persistence, credential-access, defense-evasion). Returns prioritized uncovered techniques.',
-      inputSchema: {
+      inputSchema: z.object({
         threat_profile: THREAT_PROFILE_ENUM.describe('Threat profile to analyze'),
-      },
+      }),
       annotations: { title: 'Identify Detection Gaps', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -263,12 +265,12 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Technique Intelligence',
       description:
         'Deep intelligence for a single MITRE technique ID: detections by source, actors using it, related sub-techniques, coverage gaps.',
-      inputSchema: {
+      inputSchema: z.object({
         technique_id: z
           .string()
           .regex(/^T\d{4}(\.\d{3})?$/)
           .describe('MITRE technique ID like T1059 or T1059.001'),
-      },
+      }),
       annotations: { title: 'Technique Intelligence', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -282,10 +284,10 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Full Technique Detail',
       description:
         'Full technique detail: all covering detections (paginated), actors using it, procedures, per-source breakdown.',
-      inputSchema: {
+      inputSchema: z.object({
         technique_id: z.string().regex(/^T\d{4}(\.\d{3})?$/).describe('MITRE technique ID'),
         detection_limit: z.number().int().min(1).max(100).optional().describe('Max detections to return (default 50)'),
-      },
+      }),
       annotations: { title: 'Full Technique Detail', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -299,9 +301,9 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Cross-Source Comparison',
       description:
         'Cross-source comparison for a MITRE technique: how many detections does each source (Sigma, Splunk, Elastic, KQL, Sublime, CQL) have for this technique, and which sources have no coverage.',
-      inputSchema: {
+      inputSchema: z.object({
         technique_id: z.string().regex(/^T\d{4}(\.\d{3})?$/).describe('MITRE technique ID'),
-      },
+      }),
       annotations: { title: 'Cross-Source Comparison', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -315,10 +317,10 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Generate Navigator Layer',
       description:
         'Generate a MITRE ATT&CK Navigator JSON layer showing covered techniques. Output can be pasted directly into the Navigator web app.',
-      inputSchema: {
+      inputSchema: z.object({
         name: z.string().optional().describe('Layer name shown in Navigator'),
         source_type: SOURCE_ENUM.optional().describe('Limit the layer to one source'),
-      },
+      }),
       annotations: { title: 'Generate Navigator Layer', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -335,10 +337,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Source',
       description: 'List detections from a specific source (sigma, splunk_escu, elastic, kql, sublime, crowdstrike_cql, jamf_protect).',
-      inputSchema: {
+      inputSchema: z.object({
         source_type: SOURCE_ENUM,
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by Source', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -353,10 +355,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Severity',
       description: 'List detections at a specific severity (informational, low, medium, high, critical).',
-      inputSchema: {
+      inputSchema: z.object({
         severity: SEVERITY_ENUM,
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by Severity', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -371,10 +373,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Detection Type',
       description: 'List detections by detection type (e.g., "TTP", "Anomaly", "Hunting", "Correlation").',
-      inputSchema: {
+      inputSchema: z.object({
         detection_type: z.string().min(1).describe('Detection type label'),
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by Detection Type', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -389,10 +391,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by MITRE Technique',
       description: 'List detections that reference a specific MITRE technique ID (via the detection_techniques junction table).',
-      inputSchema: {
+      inputSchema: z.object({
         technique_id: z.string().regex(/^T\d{4}(\.\d{3})?$/).describe('MITRE technique ID like T1059.001'),
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by MITRE Technique', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -407,10 +409,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by MITRE Tactic',
       description: 'List detections that map to a specific MITRE tactic (e.g., credential-access, defense-evasion).',
-      inputSchema: {
+      inputSchema: z.object({
         tactic: TACTIC_ENUM,
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by MITRE Tactic', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -425,10 +427,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by CVE',
       description: 'Find detections that reference a specific CVE ID.',
-      inputSchema: {
+      inputSchema: z.object({
         cve: z.string().regex(/^CVE-\d{4}-\d{4,7}$/).describe('CVE identifier like CVE-2024-12345'),
         limit: z.number().int().min(1).max(50).optional(),
-      },
+      }),
       annotations: { title: 'List by CVE', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -441,10 +443,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Process Name',
       description: 'Find detections that monitor a specific process name (e.g., rundll32.exe, powershell.exe).',
-      inputSchema: {
+      inputSchema: z.object({
         process_name: z.string().min(1).describe('Process executable name'),
         limit: z.number().int().min(1).max(50).optional(),
-      },
+      }),
       annotations: { title: 'List by Process Name', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -457,10 +459,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Data Source',
       description: 'Find detections that require a specific data source (e.g., "Sysmon", "Windows Event Log", "Process Creation").',
-      inputSchema: {
+      inputSchema: z.object({
         data_source: z.string().min(1).describe('Data source name'),
         limit: z.number().int().min(1).max(50).optional(),
-      },
+      }),
       annotations: { title: 'List by Data Source', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -473,10 +475,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List by Analytic Story',
       description: 'List detections that belong to a Splunk Analytic Story (e.g., "Ransomware", "Cloud Federated Credential Abuse").',
-      inputSchema: {
+      inputSchema: z.object({
         story: z.string().min(1).describe('Analytic story name'),
         limit: z.number().int().min(1).max(100).optional(),
-      },
+      }),
       annotations: { title: 'List by Analytic Story', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -493,10 +495,10 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'List Threat Actors',
       description: 'List or search MITRE ATT&CK threat actors. Pass a query to search by name or alias.',
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().optional().describe('Search term (matches name and aliases)'),
         limit: z.number().int().min(1).max(200).optional(),
-      },
+      }),
       annotations: { title: 'List Threat Actors', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -509,9 +511,9 @@ export function registerHostedTools(server: McpServer): void {
     {
       title: 'Threat Actor Profile',
       description: 'Get a full profile for a threat actor: description, aliases, technique list, and detection coverage %.',
-      inputSchema: {
+      inputSchema: z.object({
         actor_name: z.string().min(1).describe('Threat actor name (e.g., "APT29", "FIN7")'),
-      },
+      }),
       annotations: { title: 'Threat Actor Profile', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -525,9 +527,9 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Analyze Actor Coverage',
       description:
         'Deep intelligence about a threat actor: per-tactic coverage breakdown, covered techniques with detection counts, and all uncovered technique gaps.',
-      inputSchema: {
+      inputSchema: z.object({
         actor_name: z.string().min(1).describe('Threat actor name'),
-      },
+      }),
       annotations: { title: 'Analyze Actor Coverage', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
@@ -541,9 +543,9 @@ export function registerHostedTools(server: McpServer): void {
       title: 'Compare Actor Coverage',
       description:
         'Compare two or more threat actors side-by-side: total techniques, coverage %, shared gaps, unique gaps.',
-      inputSchema: {
+      inputSchema: z.object({
         actor_names: z.array(z.string().min(1)).min(2).max(5).describe('Between 2 and 5 actor names to compare'),
-      },
+      }),
       annotations: { title: 'Compare Actor Coverage', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },

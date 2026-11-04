@@ -181,13 +181,13 @@ test('Detections have file_path populated', () => {
   assert(missing === 0, `${missing} detections are missing file_path`);
 });
 
-test('No duplicate IDs', () => {
+test('No duplicate source-qualified IDs', () => {
   const db = getDb();
   const dupes = db.prepare(`
-    SELECT id, COUNT(*) as cnt FROM detections GROUP BY id HAVING cnt > 1
+    SELECT source_type, id, COUNT(*) as cnt FROM detections GROUP BY source_type, id HAVING cnt > 1
   `).all();
 
-  assert(dupes.length === 0, `Found ${dupes.length} duplicate IDs`);
+  assert(dupes.length === 0, `Found ${dupes.length} duplicate source-qualified IDs`);
 });
 
 // =============================================================================

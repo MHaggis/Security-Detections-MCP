@@ -1,3 +1,5 @@
+import { createSchema } from './db/schema.js';
+import { findDetectionRow, upsertDetection } from './db/identity.js';
 import Database from 'better-sqlite3';
 import { platform } from 'os';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
@@ -21,158 +23,13 @@ export function initDb(): Database.Database {
   
   db = new Database(DB_PATH);
   
-  // Create main detections table with all enhanced fields
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS detections (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      query TEXT,
-      source_type TEXT NOT NULL,
-      mitre_ids TEXT,
-      logsource_category TEXT,
-      logsource_product TEXT,
-      logsource_service TEXT,
-      severity TEXT,
-      status TEXT,
-      author TEXT,
-      date_created TEXT,
-      date_modified TEXT,
-      refs TEXT,
-      falsepositives TEXT,
-      tags TEXT,
-      file_path TEXT,
-      raw_yaml TEXT,
-      cves TEXT,
-      analytic_stories TEXT,
-      data_sources TEXT,
-      detection_type TEXT,
-      asset_type TEXT,
-      security_domain TEXT,
-      process_names TEXT,
-      file_paths TEXT,
-      registry_paths TEXT,
-      mitre_tactics TEXT,
-      platforms TEXT,
-      kql_category TEXT,
-      kql_tags TEXT,
-      kql_keywords TEXT,
-      sublime_attack_types TEXT,
-      sublime_detection_methods TEXT,
-      sublime_tactics TEXT
-    )
-  `);
-  
-  // Create FTS5 virtual table for full-text search with all searchable fields
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS detections_fts USING fts5(
-      id,
-      name,
-      description,
-      query,
-      mitre_ids,
-      tags,
-      cves,
-      analytic_stories,
-      data_sources,
-      process_names,
-      file_paths,
-      registry_paths,
-      mitre_tactics,
-      platforms,
-      kql_category,
-      kql_tags,
-      kql_keywords,
-      sublime_attack_types,
-      sublime_detection_methods,
-      sublime_tactics,
-      content='detections',
-      content_rowid='rowid'
-    )
-  `);
-
-  // Create triggers to keep FTS in sync
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_ai AFTER INSERT ON detections BEGIN
-      INSERT INTO detections_fts(rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords, sublime_attack_types, sublime_detection_methods, sublime_tactics)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.query, NEW.mitre_ids, NEW.tags, NEW.cves, NEW.analytic_stories, NEW.data_sources, NEW.process_names, NEW.file_paths, NEW.registry_paths, NEW.mitre_tactics, NEW.platforms, NEW.kql_category, NEW.kql_tags, NEW.kql_keywords, NEW.sublime_attack_types, NEW.sublime_detection_methods, NEW.sublime_tactics);
-    END
-  `);
-
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_ad AFTER DELETE ON detections BEGIN
-      INSERT INTO detections_fts(detections_fts, rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords, sublime_attack_types, sublime_detection_methods, sublime_tactics)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.query, OLD.mitre_ids, OLD.tags, OLD.cves, OLD.analytic_stories, OLD.data_sources, OLD.process_names, OLD.file_paths, OLD.registry_paths, OLD.mitre_tactics, OLD.platforms, OLD.kql_category, OLD.kql_tags, OLD.kql_keywords, OLD.sublime_attack_types, OLD.sublime_detection_methods, OLD.sublime_tactics);
-    END
-  `);
-
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS detections_au AFTER UPDATE ON detections BEGIN
-      INSERT INTO detections_fts(detections_fts, rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords, sublime_attack_types, sublime_detection_methods, sublime_tactics)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.query, OLD.mitre_ids, OLD.tags, OLD.cves, OLD.analytic_stories, OLD.data_sources, OLD.process_names, OLD.file_paths, OLD.registry_paths, OLD.mitre_tactics, OLD.platforms, OLD.kql_category, OLD.kql_tags, OLD.kql_keywords, OLD.sublime_attack_types, OLD.sublime_detection_methods, OLD.sublime_tactics);
-      INSERT INTO detections_fts(rowid, id, name, description, query, mitre_ids, tags, cves, analytic_stories, data_sources, process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords, sublime_attack_types, sublime_detection_methods, sublime_tactics)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.query, NEW.mitre_ids, NEW.tags, NEW.cves, NEW.analytic_stories, NEW.data_sources, NEW.process_names, NEW.file_paths, NEW.registry_paths, NEW.mitre_tactics, NEW.platforms, NEW.kql_category, NEW.kql_tags, NEW.kql_keywords, NEW.sublime_attack_types, NEW.sublime_detection_methods, NEW.sublime_tactics);
-    END
-  `);
-  
-  // Create indexes for common queries
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_source_type ON detections(source_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_severity ON detections(severity)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_logsource_product ON detections(logsource_product)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_logsource_category ON detections(logsource_category)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_detection_type ON detections(detection_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_asset_type ON detections(asset_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_security_domain ON detections(security_domain)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_kql_category ON detections(kql_category)`);
-  
-  // Create stories table (optional - provides rich context for analytic stories)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS stories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      narrative TEXT,
-      author TEXT,
-      date TEXT,
-      version INTEGER,
-      status TEXT,
-      refs TEXT,
-      category TEXT,
-      usecase TEXT,
-      detection_names TEXT
-    )
-  `);
-  
-  // Create FTS5 for stories (narrative is key for semantic search!)
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS stories_fts USING fts5(
-      id,
-      name,
-      description,
-      narrative,
-      category,
-      usecase,
-      content='stories',
-      content_rowid='rowid'
-    )
-  `);
-  
-  // Triggers for stories FTS
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS stories_ai AFTER INSERT ON stories BEGIN
-      INSERT INTO stories_fts(rowid, id, name, description, narrative, category, usecase)
-      VALUES (NEW.rowid, NEW.id, NEW.name, NEW.description, NEW.narrative, NEW.category, NEW.usecase);
-    END
-  `);
-  
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS stories_ad AFTER DELETE ON stories BEGIN
-      INSERT INTO stories_fts(stories_fts, rowid, id, name, description, narrative, category, usecase)
-      VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.description, OLD.narrative, OLD.category, OLD.usecase);
-    END
-  `);
-  
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_story_category ON stories(category)`);
+  try {
+    createSchema(db);
+  } catch (error) {
+    db.close();
+    db = null;
+    throw error;
+  }
   
   return db;
 }
@@ -229,57 +86,7 @@ export function recreateDb(): void {
 }
 
 export function insertDetection(detection: Detection): void {
-  const database = initDb();
-  
-  const stmt = database.prepare(`
-    INSERT OR REPLACE INTO detections
-    (id, name, description, query, source_type, mitre_ids, logsource_category,
-     logsource_product, logsource_service, severity, status, author,
-     date_created, date_modified, refs, falsepositives, tags, file_path, raw_yaml,
-     cves, analytic_stories, data_sources, detection_type, asset_type, security_domain,
-     process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords,
-     sublime_attack_types, sublime_detection_methods, sublime_tactics)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(
-    detection.id,
-    detection.name,
-    detection.description,
-    detection.query,
-    detection.source_type,
-    JSON.stringify(detection.mitre_ids),
-    detection.logsource_category,
-    detection.logsource_product,
-    detection.logsource_service,
-    detection.severity,
-    detection.status,
-    detection.author,
-    detection.date_created,
-    detection.date_modified,
-    JSON.stringify(detection.references),
-    JSON.stringify(detection.falsepositives),
-    JSON.stringify(detection.tags),
-    detection.file_path,
-    detection.raw_yaml,
-    JSON.stringify(detection.cves),
-    JSON.stringify(detection.analytic_stories),
-    JSON.stringify(detection.data_sources),
-    detection.detection_type,
-    detection.asset_type,
-    detection.security_domain,
-    JSON.stringify(detection.process_names),
-    JSON.stringify(detection.file_paths),
-    JSON.stringify(detection.registry_paths),
-    JSON.stringify(detection.mitre_tactics),
-    JSON.stringify(detection.platforms),
-    detection.kql_category,
-    JSON.stringify(detection.kql_tags),
-    JSON.stringify(detection.kql_keywords),
-    JSON.stringify(detection.sublime_attack_types),
-    JSON.stringify(detection.sublime_detection_methods),
-    JSON.stringify(detection.sublime_tactics)
-  );
+  upsertDetection(initDb(), detection);
 }
 
 function rowToDetection(row: Record<string, unknown>): Detection {
@@ -339,12 +146,8 @@ export function searchDetections(query: string, limit: number = 50): Detection[]
   return rows.map(rowToDetection);
 }
 
-export function getDetectionById(id: string): Detection | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT * FROM detections WHERE id = ?');
-  const row = stmt.get(id) as Record<string, unknown> | undefined;
-  
+export function getDetectionById(id: string, sourceType?: string): Detection | null {
+  const row = findDetectionRow(initDb(), id, sourceType);
   return row ? rowToDetection(row) : null;
 }
 
@@ -663,13 +466,8 @@ export function getStats(): IndexStats {
   };
 }
 
-export function getRawYaml(id: string): string | null {
-  const database = initDb();
-  
-  const stmt = database.prepare('SELECT raw_yaml FROM detections WHERE id = ?');
-  const row = stmt.get(id) as { raw_yaml: string } | undefined;
-  
-  return row?.raw_yaml || null;
+export function getRawYaml(id: string, sourceType?: string): string | null {
+  return (findDetectionRow(initDb(), id, sourceType)?.raw_yaml as string) || null;
 }
 
 export function dbExists(): boolean {
@@ -1020,7 +818,7 @@ export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic'
   const database = initDb();
   
   // Get all technique IDs covered
-  let countSql = 'SELECT COUNT(DISTINCT id) as count FROM detections';
+  let countSql = 'SELECT COUNT(*) as count FROM detections';
   if (sourceType) countSql += ' WHERE source_type = ?';
   const totalDetections = sourceType 
     ? (database.prepare(countSql).get(sourceType) as { count: number }).count

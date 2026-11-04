@@ -8,7 +8,7 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { getConfig } from '../config.js';
 import type { PipelineState, Gap, Detection } from '../state/types.js';
 
@@ -111,7 +111,7 @@ export async function detectionEngineerNode(state: PipelineState): Promise<Parti
   if (cfg.dryRun || !cfg.anthropicApiKey) {
     console.log('[Detection Engineer] Dry-run mode - returning mock detections');
     const mockDetections: Detection[] = gapsToAddress.slice(0, cfg.maxDetectionsPerRun).map(gap => ({
-      id: uuidv4(),
+      id: randomUUID(),
       name: `mock_detection_${gap.technique_id.toLowerCase().replace('.', '_')}`,
       file_path: join(detectionsPath, 'endpoint', `mock_${gap.technique_id.toLowerCase().replace('.', '_')}.yml`),
       technique_id: gap.technique_id,
@@ -148,7 +148,7 @@ Technique ID: ${gap.technique_id}
 Technique Name: ${gap.technique_name}
 Context from threat intel: ${context}
 Today's date: ${today}
-UUID to use: ${uuidv4()}
+UUID to use: ${randomUUID()}
 
 Return ONLY the complete YAML content, no explanation.`;
 
@@ -186,7 +186,7 @@ Return ONLY the complete YAML content, no explanation.`;
       console.log(`[Detection Engineer] Written: ${filePath}`);
       
       detections.push({
-        id: uuidv4(),
+        id: randomUUID(),
         name: detectionName,
         file_path: filePath,
         technique_id: gap.technique_id,
