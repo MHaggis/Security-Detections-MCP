@@ -109,7 +109,7 @@ try {
   await assert.rejects(seed(),/Seed failed/);
   assert.equal((await good(service.from('sync_runs').select('*').eq('status','failed'))).length,2);
   assert.equal((await good(service.from('detection_techniques').select('*').eq('source_type','sigma')))[0].technique_id,'T2001');
-  sqlite.close();
+
   await good(service.from('detections').delete().eq('source_type','sigma').eq('id','collision'));
   assert.equal((await good(service.from('detection_techniques').select('*'))).length,1);
   assert.equal((await queries.getDetectionById('collision')).source_type,'elastic');
@@ -117,6 +117,66 @@ try {
   await good(service.from('detections').upsert(sources.map(source=>({...rule(source,source,'T3000'),id:'seven'})),{onConflict:'source_type,id'}));
   assert.equal((await good(service.from('detections').select('*').eq('id','seven'))).length,7);
   assert.equal((await good(service.rpc('get_technique_source_counts',{p_technique_id:'T3000'}))).length,7);
+  // Reproduce the hosted limit through actual PostgREST connections. The
+  // per-row delay makes large writes exceed 800ms while split batches fit.
+  sql(`CREATE FUNCTION public.test_slow_catalog_write() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.id LIKE 'cancel-%' THEN
+        RAISE EXCEPTION 'canceling statement due to user request' USING ERRCODE='57014';
+      END IF;
+      IF NEW.id LIKE 'timeout-%' THEN
+        PERFORM pg_sleep(CASE WHEN NEW.id='timeout-single' THEN 1.2 ELSE 0.02 END);
+      END IF;
+      RETURN NEW;
+    END; $$;
+    CREATE TRIGGER test_slow_catalog_write BEFORE INSERT OR UPDATE ON detections
+      FOR EACH ROW EXECUTE FUNCTION public.test_slow_catalog_write();
+    ALTER ROLE postgres SET statement_timeout='800ms';`);
+  docker('restart',rest);
+  for(let i=0;i<60;i++){try{if((await fetch(url)).ok)break;}catch{} await new Promise(r=>setTimeout(r,100));}
+  const timeoutRows=Array.from({length:100},(_,i)=>({
+    id:`timeout-${Math.floor(i/2)}`,source_type:i%2?'elastic':'sigma',name:'Timeout first',mitre_ids:['T4000'],
+  }));
+  const canceled=await service.from('detections').upsert(timeoutRows,{onConflict:'source_type,id'});
+  assert.equal(canceled.error?.code,'57014');
+  assert.equal((await good(service.from('detections').select('*').like('id','timeout-%'))).length,0,'canceled statement must roll back every detection');
+  assert.equal((await good(service.from('detection_techniques').select('*').like('detection_id','timeout-%'))).length,0,'canceled statement must roll back every edge');
+  sqlite.exec('DELETE FROM detections');
+  const add=sqlite.prepare('INSERT INTO detections VALUES(?,?,?,?)');
+  for(const row of timeoutRows) add.run(row.id,row.name,row.source_type,JSON.stringify(row.mitre_ids));
+  const completedBefore=(await good(service.from('sync_runs').select('*').eq('status','completed'))).length;
+  const recovered=await seed();
+  assert.match(recovered.stderr,/canceled \(57014\); splitting 100 rows into 50 and 50/);
+  assert.equal((await good(service.from('detections').select('*').like('id','timeout-%'))).length,100);
+  assert.equal((await good(service.from('detection_techniques').select('*').eq('technique_id','T4000'))).length,100);
+  sqlite.exec(`UPDATE detections SET name='Timeout repeated',mitre_ids='["T4001"]'`);
+  const repeated=await seed();
+  assert.match(repeated.stderr,/canceled \(57014\); splitting/);
+  assert.equal((await good(service.from('detections').select('*').like('id','timeout-%'))).length,100);
+  assert.equal((await good(service.from('detection_techniques').select('*').eq('technique_id','T4000'))).length,0);
+  assert.equal((await good(service.from('detection_techniques').select('*').eq('technique_id','T4001'))).length,100);
+  assert.equal((await good(service.from('sync_runs').select('*').eq('status','completed'))).length,completedBefore+2);
+  const beforeSingle=(await good(service.from('sync_runs').select('*').eq('status','failed'))).length;
+  sqlite.exec(`DELETE FROM detections; INSERT INTO detections VALUES('timeout-single','Cannot fit','sigma','["T4002"]');`);
+  await assert.rejects(seed(),error=>{
+    assert.match(error.stderr,/detections batch 0 failed: canceling statement due to statement timeout/);
+    assert.doesNotMatch(error.stderr,/splitting/);
+    return true;
+  });
+  assert.equal((await good(service.from('sync_runs').select('*').eq('status','failed'))).length,beforeSingle+1);
+  assert.equal((await good(service.from('detections').select('*').eq('id','timeout-single'))).length,0);
+  sqlite.exec(`DELETE FROM detections; INSERT INTO detections VALUES
+    ('cancel-first','Canceled','sigma','["T4003"]'),('cancel-second','Canceled','elastic','["T4003"]');`);
+  await assert.rejects(seed(),error=>{
+    assert.match(error.stderr,/detections batch 0 failed: canceling statement due to user request/);
+    assert.doesNotMatch(error.stderr,/splitting/);
+    return true;
+  });
+  assert.equal((await good(service.from('sync_runs').select('*').eq('status','failed'))).length,beforeSingle+2);
+  assert.equal((await good(service.from('detections').select('*').like('id','cancel-%'))).length,0);
+  assert.equal((await good(service.from('sync_runs').select('*').eq('status','completed'))).length,completedBefore+2);
+  sqlite.close();
+  console.log('PASS: real 57014 rollback, bounded batch splitting, repeat source-specific edge reconciliation, and terminal single-row timeout failure');
   console.log('PASS: legacy migration, collision retention, composite API upserts/joins, exact edge replacement, RPCs, atomic migration/batch rollback, FK, RLS, TRUNCATE denial, all seven sources, hosted lookups and repeat/failing real seed');
 } finally {
   if(proxy) await new Promise(resolve=>proxy.close(resolve));

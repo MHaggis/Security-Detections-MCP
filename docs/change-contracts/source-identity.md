@@ -1,8 +1,9 @@
 # Source-qualified detection identity
 
-Issue: #34. Assurance: A2 data migration, with independent security/release
-review and production-semantic SQLite/Postgres tests. This changes the global
-public detection catalog, not user authentication, tenant policy or credentials.
+Issue: #34. Assurance: A2 for catalog identity and A3 for the catalog privilege
+cleanup, with independent security/release review and production-semantic
+SQLite/Postgres tests. Authentication and profile/accounting hardening are
+covered by the separate hosted-security contract.
 
 ## Approved outcome
 
@@ -40,18 +41,20 @@ present source choices rather than a wrong rule or generic 404.
 | ID-004 | Junctions, coverage and pattern examples cannot mix sources with a shared ID. | Different techniques per colliding rule; join/count assertions in real databases. |
 | ID-005 | Existing single-key SQLite/Postgres schemas migrate transactionally with rows, FTS and links preserved. | Upgrade from legacy schema; deliberately failed migration/constraint tests; repeat initialization. |
 | ID-006 | Sync uses actual composite conflict targets and propagates write errors. | Real Postgres conflict/upsert tests; explicit source counts before/after two syncs; no swallowed failed batches. |
-| ID-007 | Anonymous/authenticated catalog reads remain permitted and writes remain denied; service role retains bounded sync access. | Postgres role/RLS/grant assertions, including forbidden source mutation and orphan edges. |
+| ID-007 | Anonymous/authenticated catalog reads remain permitted and writes remain denied; the existing service role retains sync access and its RLS bypass privileges. | Postgres role/RLS/grant assertions, including forbidden source mutation and orphan edges. |
 
 ## Integration and release order
 
 1. Review this design and affected consumers before implementation.
 2. Test against disposable native SQLite and PostgreSQL, including legacy
-   upgrades and all seven configured source formats. Docker is currently
-   unavailable, so native PostgreSQL 17 is the local database test seam.
+   upgrades and all seven configured source formats. Use native PostgreSQL
+   16/17 for role/concurrency tests and Dockerized PostgreSQL/PostgREST for
+   actual Supabase client and Data API tests.
 3. Independently review final migrations, grants, source lookup and seed failure
    behavior. Run root/agents/web checks and Linux/Windows CI.
-4. Before production schema changes, identify the correct project, confirm no
-   sync is active, verify recoverability, and retain the reviewed migration hash.
+4. Before production schema changes, identify the correct project, pause the
+   nightly workflow, confirm no sync is active, verify recoverability, and retain
+   the reviewed migration hash.
    No customer data/credentials may be copied to .context.
 5. Migrate catalog keys and deploy compatible readers/sync as one controlled
    sequence. Existing rows are not renamed or deleted. Old id-only sync writers
