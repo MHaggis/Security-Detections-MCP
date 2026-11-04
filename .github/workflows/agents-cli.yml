@@ -3,12 +3,6 @@ name: Agents CLI - Smoke Tests
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'agents/**'
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/agents-cli.yml'
   pull_request:
     branches: [main, develop]
     paths:

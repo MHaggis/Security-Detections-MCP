@@ -3,7 +3,6 @@ name: Automation queue
 on:
   push:
     branches: [main, develop]
-    paths: ['automation/**', 'agents/**', 'src/**', 'package.json', 'package-lock.json', '.github/workflows/automation.yml']
   pull_request:
     branches: [main, develop]
     paths: ['automation/**', 'agents/**', 'src/**', 'package.json', 'package-lock.json', '.github/workflows/automation.yml']

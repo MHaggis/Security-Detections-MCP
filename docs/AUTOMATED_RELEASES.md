@@ -61,4 +61,4 @@ npm run build
 npm run test:package
 ```
 
-Clients using `npx -y security-detections-mcp@latest` resolve the newest package when launched; restart the MCP connection after a release. Clients pinned to a version remain pinned. Existing running processes do not hot-update.
+Clients using `npx -y security-detections-mcp@latest` resolve the newest package when launched; restart the MCP connection after a release. Clients pinned to a version remain pinned until their configured version is changed. Global installs require `npm install --global security-detections-mcp@latest`, followed by restarting the MCP connection. Existing running processes do not hot-update or restart automatically.

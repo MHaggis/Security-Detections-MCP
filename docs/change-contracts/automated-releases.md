@@ -13,7 +13,7 @@ Assurance A3: this changes the release authorization boundary and distributes ex
 | REL-005 | Publish exactly the tested production tarball with no unexpected files. | Clean consumer native SQLite/MCP test; archive allowlist; digest, path/version tamper tests; retained artifact. |
 | REL-006 | npm and Registry publishing use short-lived workflow identity. | No static npm token reference; isolated npm-release job; pinned publisher digest; first actual publishing run. |
 
-Required workflow files: `ci.yml`, `agents-cli.yml`, `automation.yml`, `hosted-security.yml`, `release-validation.yml`. The integration lead removes main-push path filters from prerequisite workflows before promotion. PR filters may remain. The orchestrator intentionally blocks on absent workflows rather than guessing whether they were applicable.
+Required workflow files: `ci.yml`, `agents-cli.yml`, `automation.yml`, `hosted-security.yml`, `release-validation.yml`. The integrated branch removes main-push path filters from prerequisite workflows so every main commit has all required evidence. PR filters may remain. The orchestrator intentionally blocks on absent workflows rather than guessing whether they were applicable.
 
 No account settings, credentials, remote release, npm publish, or Registry writes were performed while implementing this slice. The user must configure npm trusted publishing for owner `MHaggis`, repository `Security-Detections-MCP`, workflow `publish.yml`, environment `npm-release`, with direct publishing allowed. GitHub environment configuration is coordinated by the lead.
 
