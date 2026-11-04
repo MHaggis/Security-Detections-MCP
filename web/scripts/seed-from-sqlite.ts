@@ -7,6 +7,7 @@
  * and pushes all data to the Supabase project configured in .env.local
  */
 import { createClient } from '@supabase/supabase-js';
+import { createCatalogPostgres } from './catalog-postgres.mjs';
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -24,15 +25,25 @@ if (!existsSync(SQLITE_PATH)) {
   process.exit(1);
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+const transport = process.env.CATALOG_SEED_TRANSPORT || 'postgres';
+if (!['postgres', 'http'].includes(transport)) {
+  console.error('Invalid CATALOG_SEED_TRANSPORT; expected postgres or explicit legacy http');
   process.exit(1);
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const databaseUrl = process.env.SUPABASE_CATALOG_DATABASE_URL;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (transport === 'postgres' && !databaseUrl) {
+  console.error('Missing SUPABASE_CATALOG_DATABASE_URL; direct catalog sync fails closed');
+  process.exit(1);
+}
+if (transport === 'http' && (!supabaseUrl || !supabaseKey)) {
+  console.error('Explicit HTTP transport requires Supabase URL and service role key');
+  process.exit(1);
+}
+// HTTP is an explicit compatibility/test option, never a fallback from PostgreSQL.
+const direct = transport === 'postgres' ? createCatalogPostgres(databaseUrl!) : null;
+const supabase = transport === 'http' ? createClient(supabaseUrl!, supabaseKey!) : null;
 const sqlite = new Database(SQLITE_PATH, { readonly: true });
 const SYNC_SOURCE_TYPE = process.env.SYNC_SOURCE_TYPE || 'nightly_full';
 const MAX_SYNC_ERROR_CHARS = 2000;
@@ -44,7 +55,7 @@ async function main() {
   try {
     console.log('=== Seeding Supabase from SQLite ===');
     console.log(`SQLite: ${SQLITE_PATH}`);
-    console.log(`Supabase: ${supabaseUrl}`);
+    console.log(`Catalog transport: ${transport}`);
     console.log(`Sync source: ${SYNC_SOURCE_TYPE}`);
     console.log('');
 
@@ -79,11 +90,13 @@ async function main() {
     throw err;
   } finally {
     sqlite.close();
+    if (direct) await direct.close();
   }
 }
 
 async function getDetectionCount(): Promise<number> {
-  const { count, error } = await supabase
+  if (direct) return direct.count();
+  const { count, error } = await supabase!
     .from('detections')
     .select('id', { count: 'exact', head: true });
 
@@ -95,7 +108,8 @@ async function getDetectionCount(): Promise<number> {
 }
 
 async function startSyncRun(preRunDetections: number): Promise<string> {
-  const { data, error } = await supabase
+  if (direct) return direct.start(SYNC_SOURCE_TYPE, preRunDetections);
+  const { data, error } = await supabase!
     .from('sync_runs')
     .insert({
       source_type: SYNC_SOURCE_TYPE,
@@ -121,7 +135,8 @@ async function completeSyncRun(
   syncRunId: string,
   metrics: { detectionsTotal: number; detectionsAdded: number; detectionsUpdated: number }
 ): Promise<void> {
-  const { error } = await supabase
+  if (direct) return direct.complete(syncRunId, metrics);
+  const { error } = await supabase!
     .from('sync_runs')
     .update({
       completed_at: new Date().toISOString(),
@@ -139,7 +154,12 @@ async function completeSyncRun(
 }
 
 async function failSyncRun(syncRunId: string, errorMessage: string): Promise<void> {
-  const { error } = await supabase
+  if (direct) {
+    try { await direct.fail(syncRunId, errorMessage); }
+    catch { console.error('Failed to mark catalog sync failed'); }
+    return;
+  }
+  const { error } = await supabase!
     .from('sync_runs')
     .update({
       completed_at: new Date().toISOString(),
@@ -184,10 +204,10 @@ async function upsertBatch(table: string, rows: Record<string, unknown>[], batch
       await writeBatch(batch.slice(middle), offset + middle);
       return;
     }
-    const { data, error } = await supabase.rpc('seed_catalog_batch', {
-      p_table: table,
-      p_payload: Buffer.from(json, 'utf8').toString('base64'),
-    });
+    const payload = Buffer.from(json, 'utf8').toString('base64');
+    const { data, error } = direct
+      ? await direct.write(table, payload)
+      : await supabase!.rpc('seed_catalog_batch', { p_table: table, p_payload: payload });
     if (!error) {
       if (!data || data.processed !== batch.length) {
         throw new Error(`${table} batch ${offset} failed: invalid catalog acknowledgement`);

@@ -206,3 +206,5 @@ jobs:
       - run: npm ci --prefix web
       - name: Verify real PostgreSQL and PostgREST catalog identity
         run: node --experimental-strip-types web/tests/source-identity.integration.mjs
+      - name: Verify dedicated catalog login and TLS transport
+        run: node --experimental-strip-types web/tests/direct-catalog.integration.mjs

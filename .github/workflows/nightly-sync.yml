@@ -106,5 +106,5 @@ jobs:
         run: cd web && npx tsx scripts/seed-from-sqlite.ts
         env:
           SYNC_SOURCE_TYPE: nightly_full
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CATALOG_SEED_TRANSPORT: postgres
+          SUPABASE_CATALOG_DATABASE_URL: ${{ secrets.SUPABASE_CATALOG_DATABASE_URL }}

@@ -1,0 +1,46 @@
+-- Dedicated catalog writer: provision its LOGIN/password separately after review.
+BEGIN;
+CREATE ROLE catalog_sync NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+ALTER ROLE catalog_sync SET statement_timeout = '8s';
+ALTER ROLE catalog_sync SET lock_timeout = '8s';
+GRANT CONNECT ON DATABASE postgres TO catalog_sync;
+GRANT USAGE ON SCHEMA public TO catalog_sync;
+-- A direct login with TEMP rights must not attach the signup definer to its own table.
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated, catalog_sync;
+GRANT EXECUTE ON FUNCTION public.seed_catalog_batch(text, text) TO catalog_sync;
+GRANT EXECUTE ON FUNCTION public.reconcile_detection_techniques() TO catalog_sync;
+GRANT SELECT, INSERT, UPDATE ON public.detections TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.detections FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.detections FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.technique_tactics TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.technique_tactics FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.technique_tactics FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.attack_techniques TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.attack_techniques FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.attack_techniques FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.attack_actors TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.attack_actors FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.attack_actors FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.attack_software TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.attack_software FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.attack_software FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.actor_techniques TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.actor_techniques FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.actor_techniques FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.software_techniques TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.software_techniques FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.software_techniques FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.procedure_reference TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.procedure_reference FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.procedure_reference FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.stories TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.stories FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.stories FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE ON public.sync_runs TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.sync_runs FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_update ON public.sync_runs FOR UPDATE TO catalog_sync USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, DELETE ON public.detection_techniques TO catalog_sync;
+CREATE POLICY catalog_sync_insert ON public.detection_techniques FOR INSERT TO catalog_sync WITH CHECK (true);
+CREATE POLICY catalog_sync_delete ON public.detection_techniques FOR DELETE TO catalog_sync USING (true);
+-- Existing public-read policies cover SELECT. No membership or account/auth grants.
+COMMIT;
