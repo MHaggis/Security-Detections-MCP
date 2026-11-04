@@ -277,9 +277,9 @@ The pipeline uses three MCPs (the first is always used; the second depends on yo
   "@langchain/langgraph": "^1.1.2",
   "@langchain/anthropic": "^1.3.12",
   "@langchain/core": "^1.1.17",
-  "zod": "^3.25.0",
+  "zod": "^4.6.7",
   "commander": "^12.0.0",
-  "uuid": "^10.0.0"
+  "yaml": "^2.4.0"
 }
 ```
 

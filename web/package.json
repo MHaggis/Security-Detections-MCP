@@ -7,22 +7,23 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:http": "node tests/hosted-http-smoke.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/ssr": "0.6.1",
+    "@supabase/supabase-js": "2.103.0",
     "@vercel/analytics": "^2.0.1",
-    "mcp-handler": "^1.1.0",
-    "next": "^15.3.1",
+    "mcp-handler": "^2.3.0",
+    "next": "^16.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7",
+    "@modelcontextprotocol/server": "^2.4.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/dotenv": "^6.1.1",
@@ -31,10 +32,14 @@
     "@types/react-dom": "^19.1.2",
     "better-sqlite3": "^12.8.0",
     "dotenv": "^17.4.1",
-    "eslint": "^9.26.0",
-    "eslint-config-next": "^15.3.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.5",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.12"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }
