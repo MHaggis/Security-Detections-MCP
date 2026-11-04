@@ -1,19 +1,19 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mhaggis/security-detections-mcp",
-  "description": "Aggregates security detection rules from Sigma, Splunk ESCU, Elastic, and KQL into a unified searchable SQLite database with MITRE ATT&CK mappings, CVE tracking, coverage analysis, and detection engineering intelligence for security analysts and threat hunters.",
+  "description": "Search security detections across Sigma, Splunk, Elastic, KQL, Sublime, CQL and Jamf with ATT&CK.",
   "title": "Security Detections",
   "repository": {
     "url": "https://github.com/MHaggis/Security-Detections-MCP",
     "source": "github"
   },
-  "version": "2.1.0",
+  "version": "3.3.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "security-detections-mcp",
-      "version": "2.1.0",
+      "version": "3.3.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

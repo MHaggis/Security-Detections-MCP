@@ -300,3 +300,7 @@ location is used.
 ## License
 
 Apache 2.0
+
+## Maintainer releases
+
+The [automatic release guide](docs/AUTOMATED_RELEASES.md) covers npm trusted publishing, the CI-to-release pipeline, MCP Registry updates, and failed-run recovery.

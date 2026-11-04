@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 // MCP Server setup and configuration
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -18,10 +19,10 @@ import { listPrompts, getPrompt } from './handlers/prompts.js';
 import { listResources, listResourceTemplates, readResource } from './handlers/resources.js';
 import { getDistinctTechniqueIds, getDistinctCves, getDistinctProcessNames } from './db/detections.js';
 
-// Version from package.json would be ideal, but keeping simple for now
-const SERVER_VERSION = '2.1.0';
+// Published tarball metadata is the source of the protocol server version.
+const SERVER_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version as string;
 
-const SERVER_INSTRUCTIONS = `# Security Detections MCP v2.0 - Usage Guide
+const SERVER_INSTRUCTIONS = `# Security Detections MCP v${SERVER_VERSION} - Usage Guide
 
 ## Tool Categories
 

@@ -29,7 +29,11 @@
     "test:mcp": "npm run build && node tests/mcp-smoke-test.js",
     "lint": "tsc --noEmit --strict",
     "prepublishOnly": "npm run build && npm run lint",
-    "test:sublime": "npm run build && node tests/sublime-parser-test.js"
+    "test:sublime": "npm run build && node tests/sublime-parser-test.js",
+    "version": "node scripts/release/sync-version.mjs",
+    "release:verify": "node scripts/release/verify-release.mjs",
+    "test:release": "node --test scripts/release/*.test.mjs",
+    "test:package": "node scripts/release/package-smoke.mjs"
   },
   "keywords": [
     "mcp",
@@ -71,5 +75,6 @@
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "mcpName": "io.github.mhaggis/security-detections-mcp"
 }
