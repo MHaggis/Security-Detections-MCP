@@ -7,12 +7,16 @@ const database = vi.hoisted(() => ({
   rpc: vi.fn(),
   search: vi.fn(),
   stats: vi.fn(),
+  lookup: vi.fn(),
+  raw: vi.fn(),
 }));
 vi.mock('../lib/mcp/db', async (original) => ({
   ...await original<typeof import('../lib/mcp/db')>(),
   getServiceClient: () => ({ rpc: database.rpc }),
   searchDetections: database.search,
   getStats: database.stats,
+  getDetectionById: database.lookup,
+  getRawYaml: database.raw,
 }));
 import { GET, POST, DELETE } from '../app/api/mcp/[transport]/route';
 
@@ -95,6 +99,36 @@ describe('DEP-003: real hosted MCP protocol compatibility', () => {
     expect(database.search).toHaveBeenCalledWith('powershell', 50, undefined);
     await POST(request('tools/call', { name: 'search', arguments: { query: 'powershell', limit: 10, source_type: 'jamf_protect' } }));
     expect(database.search).toHaveBeenLastCalledWith('powershell', 10, 'jamf_protect');
+  });
+
+  it.each([false, true])('ID-003: forwards qualified identity through SDK2 (modern=%s)', async modern => {
+    database.lookup.mockResolvedValue({ id: 'collision', source_type: 'elastic', name: 'Elastic rule' });
+    database.raw.mockResolvedValue('elastic: rule');
+    const args = { id: 'collision', source_type: 'elastic' };
+    const lookup = await payload(await POST(request('tools/call', { name: 'get_by_id', arguments: args }, undefined, modern)));
+    expect(lookup.result.isError).not.toBe(true);
+    expect(JSON.parse(lookup.result.content[0].text).source_type).toBe('elastic');
+    expect(database.lookup).toHaveBeenCalledExactlyOnceWith('collision', 'elastic');
+    const raw = await payload(await POST(request('tools/call', { name: 'get_raw_yaml', arguments: args }, undefined, modern)));
+    expect(raw.result.isError).not.toBe(true);
+    expect(JSON.parse(raw.result.content[0].text).yaml).toBe('elastic: rule');
+    expect(database.raw).toHaveBeenCalledExactlyOnceWith('collision', 'elastic');
+  });
+
+  it.each(['get_by_id', 'get_raw_yaml'])('ID-003: exposes ambiguity without picking a source for %s', async name => {
+    const lookup = name === 'get_by_id' ? database.lookup : database.raw;
+    lookup.mockRejectedValue(new Error('Ambiguous detection ID collision. Specify source_type: elastic, sigma'));
+    const body = await payload(await POST(request('tools/call', { name, arguments: { id: 'collision' } })));
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toContain('Specify source_type: elastic, sigma');
+    expect(lookup).toHaveBeenCalledExactlyOnceWith('collision', undefined);
+  });
+
+  it.each(['get_by_id', 'get_raw_yaml'])('ID-003: rejects invalid source before %s lookup', async name => {
+    const body = await payload(await POST(request('tools/call', { name, arguments: { id: 'collision', source_type: 'invalid' } })));
+    expect(Boolean(body.error || body.result?.isError)).toBe(true);
+    expect(database.lookup).not.toHaveBeenCalled();
+    expect(database.raw).not.toHaveBeenCalled();
   });
 
   it.each([
