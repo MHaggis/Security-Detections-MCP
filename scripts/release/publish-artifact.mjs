@@ -36,7 +36,7 @@ if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url))
   validateArtifact(artifact,readFileSync(path),version);
   const packed=JSON.parse(execFileSync('tar',['-xOf',path,'package/package.json'],{encoding:'utf8'}));
   assert.equal(packed.name,'security-detections-mcp');assert.equal(packed.version,version);
-  assert.equal(packed.mcpName,'io.github.mhaggis/security-detections-mcp');
+  assert.equal(packed.mcpName,'io.github.MHaggis/security-detections-mcp');
   await checkUnpublished(version);
   publishTarball(path);
 }

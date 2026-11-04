@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export function verifyRelease({ pkg, lock, server, tag = `v${pkg.version}` }) {
   assert.equal(pkg.name, 'security-detections-mcp');
-  assert.equal(pkg.mcpName, 'io.github.mhaggis/security-detections-mcp');
+  assert.equal(pkg.mcpName, 'io.github.MHaggis/security-detections-mcp');
   assert.equal(server.name, pkg.mcpName);
   assert(server.description.length > 0 && server.description.length <= 100, 'Registry description must be 1–100 characters');
   assert.equal(tag, `v${pkg.version}`, 'Release tag must match package version');

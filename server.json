@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.mhaggis/security-detections-mcp",
+  "name": "io.github.MHaggis/security-detections-mcp",
   "description": "Search security detections across Sigma, Splunk, Elastic, KQL, Sublime, CQL and Jamf with ATT&CK.",
   "title": "Security Detections",
   "repository": {

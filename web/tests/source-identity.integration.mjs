@@ -1,7 +1,8 @@
 /** Production-semantic catalog regression. Requires Docker; owns only its named containers. */
 import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { createHmac } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
+import { createHmac, createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
@@ -24,6 +25,8 @@ const url = 'http://127.0.0.1:54380';
 const client = role => createClient(url, jwt(role), { auth: { persistSession: false }, global: { fetch: (input, init) => fetch(String(input).replace('/rest/v1/', '/'), init) } });
 const temporary = mkdtempSync(join(tmpdir(), 'catalog-identity-'));
 let proxy;
+let corruptAck = false;
+const rpcPayloadSizes = [];
 const migrationDir = new URL('../supabase/migrations/', import.meta.url);
 try {
   docker('network', 'create', network);
@@ -42,6 +45,7 @@ try {
   assert.equal(sql("SELECT count(*) FROM information_schema.columns WHERE table_name='detection_techniques' AND column_name='source_type'").trim(),'0');
   assert.equal(sql("SELECT count(*) FROM detections").trim(),'1');
   sql(migration);
+  sql(readFileSync(new URL(readdirSync(migrationDir).find(f=>f.includes('catalog_seed_transport')),migrationDir),'utf8'));
   assert.equal(sql("SELECT source_type || ':' || detection_id FROM detection_techniques").trim(),'sigma:collision');
   for(const role of ['anon','authenticated']) {
     assert.equal(sql(`SET ROLE ${role}; SELECT count(*) FROM detections;`).trim().split('\n').at(-1),'1');
@@ -51,7 +55,52 @@ try {
   docker('run','-d','--name',rest,'--network',network,'-p','127.0.0.1:54380:3000','-e',`PGRST_DB_URI=postgres://postgres@${pg}:5432/postgres`,'-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'public.ecr.aws/supabase/postgrest:v14.18');
   for(let i=0;i<60;i++){try{if((await fetch(url)).ok)break;}catch{} await new Promise(r=>setTimeout(r,500));}
   const service=client('service_role');
+  const encoded = rows => Buffer.from(JSON.stringify(rows),'utf8').toString('base64');
+  const rpc = (table, rows, who=service) => who.rpc('seed_catalog_batch',{p_table:table,p_payload:encoded(rows)});
+
   async function good(promise){const result=await promise;assert.equal(result.error,null,JSON.stringify(result.error));return result.data;}
+  for(const role of ['anon','authenticated']) {
+    const denied=await rpc('detections',[{id:'denied',source_type:'sigma',name:'Denied'}],client(role));
+    assert.ok(denied.error,'public callers must not execute catalog writer');
+  }
+  for(const [table,rows] of [
+    ['profiles',[{id:'user'}]], ['detection_techniques',[{source_type:'sigma',detection_id:'x',technique_id:'T1'}]],
+    ['detections; DROP TABLE detections', [{id:'x'}]],
+    ['detections',[{id:'x',source_type:'sigma',name:'x',created_at:'2026-01-01'}]],
+    ['detections',[{id:'x',source_type:'sigma',name:'x','name) VALUES(1);--':'x'}]],
+    ['detections',[{id:'x',source_type:'sigma',name:'x'},{id:'y',source_type:'sigma'}]],
+    ['detections',[{id:null,source_type:'sigma',name:'x'}]],['detections',[{source_type:'sigma',name:'x'}]],
+    ['detections',[{id:3,source_type:'sigma',name:'x'}]],['detections',[{id:'',source_type:'sigma',name:'x'}]],['detections',[{}]],['detections',[]],['detections',Array(101).fill({id:'x'})],
+    ['detections',{}],['detections',[null]],['detections',[[]]],
+  ]) assert.ok((await rpc(table,rows)).error,`must reject ${table} invalid shape/keys`);
+  for(const bad of [null,Buffer.alloc(2097153).toString('base64'),'%',Buffer.from([0xff]).toString('base64'),Buffer.from('not JSON').toString('base64'),'A'.repeat(2796205),encoded([{description:'x'.repeat(2097152)}]),'e30=\n']) {
+    assert.ok((await service.rpc('seed_catalog_batch',{p_table:'detections',p_payload:bad})).error,'must reject malformed/oversized encoding');
+  }
+  // Every allowlisted conflict target, including key-only repeats and omitted defaults.
+  const catalogCases=[
+    ['detections',{id:'rpc-rule',source_type:'sigma',name:'Original',mitre_ids:['T5000']}],
+    ['technique_tactics',{technique_id:'T5000',tactic_name:'execution'}],
+    ['attack_techniques',{technique_id:'T5000',name:'Technique'}],
+    ['attack_actors',{actor_id:'actor-test',name:'Actor'}],
+    ['attack_software',{software_id:'software-test',name:'Software'}],
+    ['actor_techniques',{actor_id:'actor-test',technique_id:'T5000'}],
+    ['software_techniques',{software_id:'software-test',technique_id:'T5000'}],
+    ['procedure_reference',{id:'procedure-test',technique_id:'T5000',name:'Procedure',category:'test',description:'Test'}],
+    ['stories',{id:'story-test',name:'Story'}],
+  ];
+  for(const [table,row] of catalogCases){assert.deepEqual(await good(rpc(table,[row])),{processed:1});assert.deepEqual(await good(rpc(table,[row])),{processed:1});}
+  assert.ok((await good(service.from('detections').select('created_at').eq('id','rpc-rule')))[0].created_at);
+  assert.equal((await good(service.from('technique_tactics').select('source').eq('technique_id','T5000')))[0].source,'detection');
+  const failed=await rpc('detections',[{id:'rpc-rule',source_type:'sigma',name:'Rollback',mitre_ids:['T5001']},{id:'bad-rpc',source_type:'sigma',name:null,mitre_ids:[]}]);
+  assert.ok(failed.error);
+  assert.equal((await good(service.from('detections').select('name').eq('id','rpc-rule')))[0].name,'Original');
+  assert.equal((await good(service.from('detection_techniques').select('technique_id').eq('detection_id','rpc-rule')))[0].technique_id,'T5000');
+  await good(rpc('detections',[{id:'rpc-default',source_type:'sigma',name:'Defaults'}]));
+  assert.deepEqual((await good(service.from('detections').select('mitre_ids').eq('id','rpc-default')))[0].mitre_ids,[]);
+  await good(rpc('detections',[{id:'rpc-rule',source_type:'sigma',name:'Changed only name'}]));
+  assert.equal((await good(service.from('detection_techniques').select('technique_id').eq('detection_id','rpc-rule')))[0].technique_id,'T5000');
+  await good(service.from('detections').delete().eq('id','rpc-default'));
+  await good(service.from('detections').delete().eq('id','rpc-rule'));
   const rule=(source,name,tech)=>({id:'collision',source_type:source,name,mitre_ids:[tech],raw_yaml:`${source}: ${name}`});
   await good(service.from('detections').upsert([rule('sigma','Sigma updated','T1002'),rule('elastic','Elastic preserved','T1003')],{onConflict:'source_type,id'}));
   assert.equal((await good(service.from('detections').select('*').eq('id','collision'))).length,2);
@@ -75,10 +124,16 @@ try {
   }
   proxy = createServer(async (req,res) => {
     const body=[]; for await (const chunk of req) body.push(chunk);
+    if(req.url.includes('/rpc/seed_catalog_batch')) {
+      const request=JSON.parse(Buffer.concat(body).toString());
+      rpcPayloadSizes.push(Buffer.from(request.p_payload,'base64').length);
+    }
     try {
       const headers={...req.headers}; delete headers.host; delete headers['content-length'];
       const response=await fetch(url+req.url.replace('/rest/v1',''),{method:req.method,headers,body:body.length?Buffer.concat(body):undefined});
-      res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
+      if(corruptAck && req.url.includes('/rpc/seed_catalog_batch') && response.ok) {
+        res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({processed:0}));
+      } else {res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));}
     } catch(error){res.writeHead(500);res.end(String(error));}
   });
   await new Promise(resolve=>proxy.listen(54381,'127.0.0.1',resolve));
@@ -175,7 +230,53 @@ try {
   assert.equal((await good(service.from('sync_runs').select('*').eq('status','failed'))).length,beforeSingle+2);
   assert.equal((await good(service.from('detections').select('*').like('id','cancel-%'))).length,0);
   assert.equal((await good(service.from('sync_runs').select('*').eq('status','completed'))).length,completedBefore+2);
+  sql("ALTER ROLE postgres RESET statement_timeout");
+  docker('restart',rest);
+  for(let i=0;i<60;i++){try{if((await fetch(url)).ok)break;}catch{} await new Promise(r=>setTimeout(r,100));}
+  const blockedBytes=gunzipSync(readFileSync(new URL('./fixtures/cql-blocked-batch.json.gz',import.meta.url)));
+  assert.equal(createHash('sha256').update(blockedBytes).digest('hex'),'ee14eba97ca988b9abd433e898cb52352ad826b62f221f118c2643284fd75c2c');
+  const blockedRows=JSON.parse(blockedBytes);
+  assert.deepEqual(await good(rpc('detections',blockedRows)),{processed:100});
+  const blockedIds=blockedRows.map(row=>row.id);
+  const roundtrip=await good(service.from('detections').select('*').in('id',blockedIds));
+  for(const original of blockedRows){
+    const actual=roundtrip.find(row=>row.id===original.id&&row.source_type===original.source_type);
+    for(const [key,value] of Object.entries(original)) assert.deepEqual(actual[key],value,`lossless ${key}`);
+  }
+  // Run the same real public rule payload through the actual SQLite seed mapping.
+  sqlite.exec('DELETE FROM detections');
+  const existingColumns=new Set(sqlite.prepare('PRAGMA table_info(detections)').all().map(row=>row.name));
+  const fields=Object.keys(blockedRows[0]);
+  for(const key of fields) if(!existingColumns.has(key)) sqlite.exec(`ALTER TABLE detections ADD COLUMN "${key}" TEXT`);
+  const insertBlocked=sqlite.prepare(`INSERT INTO detections (${fields.map(key=>`"${key}"`).join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
+  for(const row of blockedRows) insertBlocked.run(...fields.map(key=>Array.isArray(row[key])?JSON.stringify(row[key]):row[key]));
+  await seed();
+  const seeded=await good(service.from('detections').select('*').in('id',blockedIds));
+  for(const original of blockedRows){
+    const actual=seeded.find(row=>row.id===original.id);
+    for(const [key,value] of Object.entries(original)) assert.deepEqual(actual[key],value,`seed lossless ${key}`);
+  }
+  const failedBeforeAck=(await good(service.from('sync_runs').select('*').eq('status','failed'))).length;
+  corruptAck=true;
+  await assert.rejects(seed(),/invalid catalog acknowledgement/);
+  corruptAck=false;
+  assert.equal((await good(service.from('sync_runs').select('*').eq('status','failed'))).length,failedBeforeAck+1);
+  sqlite.exec('DELETE FROM detections');
+  const addLarge=sqlite.prepare('INSERT INTO detections(id,name,source_type,mitre_ids,raw_yaml) VALUES(?,?,?,?,?)');
+  addLarge.run('large-a','Large A','sigma','[]','x'.repeat(1100000));
+  addLarge.run('large-b','Large B','elastic','[]','y'.repeat(1100000));
+  const beforeLarge=rpcPayloadSizes.length;
+  await seed();
+  assert.equal(rpcPayloadSizes.length-beforeLarge,2,'oversized pair must split before transport');
+  assert.ok(rpcPayloadSizes.every(bytes=>bytes<=2097152));
+  assert.equal((await good(service.from('detections').select('raw_yaml').eq('id','large-a')))[0].raw_yaml.length,1100000);
+  sqlite.exec("DELETE FROM detections");
+  addLarge.run('too-large','Too large','sigma','[]','x'.repeat(2097153));
+  const beforeOversized=rpcPayloadSizes.length;
+  await assert.rejects(seed(),/single row exceeds 2 MiB transport limit/);
+  assert.equal(rpcPayloadSizes.length,beforeOversized,'oversized single row must not be submitted');
   sqlite.close();
+  console.log('PASS: service-only bounded catalog RPC, all nine conflict targets/defaults, malformed inputs denied, exact blocked CQL roundtrip via RPC and seed, byte splitting and acknowledgement validation');
   console.log('PASS: real 57014 rollback, bounded batch splitting, repeat source-specific edge reconciliation, and terminal single-row timeout failure');
   console.log('PASS: legacy migration, collision retention, composite API upserts/joins, exact edge replacement, RPCs, atomic migration/batch rollback, FK, RLS, TRUNCATE denial, all seven sources, hosted lookups and repeat/failing real seed');
 } finally {

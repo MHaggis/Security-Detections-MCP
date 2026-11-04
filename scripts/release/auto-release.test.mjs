@@ -126,10 +126,15 @@ test('artifact validation rejects corruption, version mismatch and path substitu
 });
 test('all release metadata must agree, including Registry ownership', async () => {
   const {verifyRelease}=await import('./verify-release.mjs');
-  const pkg={name:'security-detections-mcp',version:'3.3.1',mcpName:'io.github.mhaggis/security-detections-mcp'};
+  const pkg={name:'security-detections-mcp',version:'3.3.1',mcpName:'io.github.MHaggis/security-detections-mcp'};
   const lock={name:pkg.name,version:pkg.version,packages:{'':{version:pkg.version}}};
   const server={name:pkg.mcpName,version:pkg.version,description:'Detection search',packages:[{registryType:'npm',identifier:pkg.name,version:pkg.version}]};
   verifyRelease({pkg,lock,server});
   assert.throws(()=>verifyRelease({pkg,lock,server:{...server,version:'2.1.0'}}));
   assert.throws(()=>verifyRelease({pkg,lock,server:{...server,name:'io.github.attacker/server'}}));
+  // The Registry's OIDC grant uses the canonical GitHub owner case, even
+  // though GitHub URLs/usernames otherwise compare case-insensitively.
+  const wrongCase = 'io.github.mhaggis/security-detections-mcp';
+  assert.throws(()=>verifyRelease({pkg:{...pkg,mcpName:wrongCase},lock,server:{...server,name:wrongCase}}));
+  assert.throws(()=>verifyRelease({pkg,lock,server:{...server,name:wrongCase}}));
 });
