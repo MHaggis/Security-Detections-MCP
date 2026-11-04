@@ -1,42 +1,35 @@
 {
   "name": "autonomous-detection-platform",
   "version": "3.0.0",
-  "description": "Autonomous detection engineering platform using Cursor Subagents",
-  "main": "runners/autonomous-loop.ts",
+  "private": true,
+  "description": "SQLite threat-intelligence queue with an explicit detection-agents CLI adapter",
+  "type": "commonjs",
+  "main": "dist/runners/autonomous-loop.js",
   "scripts": {
-    "start": "./scripts/start-autonomous.sh",
-    "stop": "./scripts/stop-autonomous.sh",
-    "collect": "node collectors/cisa-rss-collector.ts once",
-    "loop": "node runners/autonomous-loop.ts",
-    "scheduler": "node runners/cron-scheduler.ts start",
-    "report": "node reports/report-generator.ts weekly",
-    "approvals": "node hitl/approval-system.ts list",
-    "migrate": "sqlite3 $DETECTIONS_DB_PATH < migrations/001_add_job_queue.sql",
-    "build": "tsc",
-    "dev": "ts-node runners/autonomous-loop.ts"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "start": "node dist/runners/autonomous-loop.js start",
+    "collect": "node dist/collectors/cisa-rss-collector.js once",
+    "loop": "node dist/runners/autonomous-loop.js once",
+    "scheduler": "node dist/runners/cron-scheduler.js",
+    "report": "node dist/reports/report-generator.js weekly",
+    "approvals": "node dist/hitl/approval-system.js",
+    "migrate": "node dist/db.js",
+    "test:agents": "npm run build && node tests/agents-integration.cjs"
   },
-  "keywords": [
-    "detection-engineering",
-    "threat-intelligence",
-    "splunk",
-    "mitre-attack",
-    "autonomous-agents",
-    "cursor-subagents"
-  ],
-  "author": "Security Content Team",
   "license": "Apache-2.0",
   "dependencies": {
-    "better-sqlite3": "^9.0.0",
-    "feedparser-promised": "^2.0.1",
-    "cron": "^3.1.6"
+    "better-sqlite3": "11.10.0",
+    "cron": "4.4.0",
+    "rss-parser": "3.13.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.20.0",
+    "typescript": "5.9.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

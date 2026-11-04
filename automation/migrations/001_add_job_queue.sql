@@ -1,6 +1,6 @@
 -- Migration: Add Job Queue and Feed Management Tables
 -- Purpose: Enable autonomous detection engineering workflows
--- Apply to: detections-mcp SQLite database
+-- Apply to: dedicated AUTOMATION_DB_PATH SQLite database (never the MCP cache)
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- JOBS TABLE - Core job queue management
