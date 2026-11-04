@@ -167,12 +167,29 @@ const CONFLICT_KEYS: Record<string, string> = {
   procedure_reference: 'id', stories: 'id',
 };
 
-async function upsertBatch(table: string, rows: Record<string, unknown>[], batchSize = 500) {
+// Keep trigger-backed catalog writes below hosted statement limits. A canceled
+// PostgreSQL statement rolls back its complete batch, so only SQLSTATE 57014 is
+// eligible for a smaller retry when the server reports a statement timeout.
+// Explicit cancellation and network/constraint/permission failures propagate.
+async function upsertBatch(table: string, rows: Record<string, unknown>[], batchSize = 100) {
   const onConflict = CONFLICT_KEYS[table];
   if (!onConflict) throw new Error(`Missing conflict key for ${table}`);
+
+  async function writeBatch(batch: Record<string, unknown>[], offset: number): Promise<void> {
+    const { error } = await supabase.from(table).upsert(batch, { onConflict });
+    if (!error) return;
+    if (error.code === '57014' && /statement timeout/i.test(error.message) && batch.length > 1) {
+      const middle = Math.floor(batch.length / 2);
+      console.warn(`${table} batch ${offset} canceled (57014); splitting ${batch.length} rows into ${middle} and ${batch.length - middle}`);
+      await writeBatch(batch.slice(0, middle), offset);
+      await writeBatch(batch.slice(middle), offset + middle);
+      return;
+    }
+    throw new Error(`${table} batch ${offset} failed: ${error.message}`);
+  }
+
   for (let i = 0; i < rows.length; i += batchSize) {
-    const { error } = await supabase.from(table).upsert(rows.slice(i, i + batchSize), { onConflict });
-    if (error) throw new Error(`${table} batch ${i} failed: ${error.message}`);
+    await writeBatch(rows.slice(i, i + batchSize), i);
   }
   return rows.length;
 }

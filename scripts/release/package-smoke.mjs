@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { verifyNpmPublishParser } from './npm-publish-dry-run.mjs';
 
 const root = process.cwd();
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -53,6 +54,8 @@ try {
     console.log(`PASS installed tarball: MCP ${pkg.version}, ${tools.length} tools, native SQLite query, error contract`);
   } catch(error) { console.error(stderr); throw error; }
   finally { await client.close();await transport.close(); }
+  verifyNpmPublishParser(archive, pkg, npmCli);
+  console.log('PASS actual npm publish parser: offline dry run, clean auth, unchanged tested tarball');
   const sha256=createHash('sha256').update(readFileSync(archive)).digest('hex');
   if(output){
     mkdirSync(output,{recursive:true});
