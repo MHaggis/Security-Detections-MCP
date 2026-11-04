@@ -1045,51 +1045,57 @@ export interface ExtractionResult {
 }
 
 export function extractAllPatterns(): ExtractionResult {
-  console.error('[patterns] Starting pattern extraction...');
-  
-  const spl = extractSPLPatterns();
-  console.error(`[patterns] Extracted ${spl.extracted} SPL patterns for ${spl.techniques} techniques`);
-  
-  const sigma = extractSigmaPatterns();
-  console.error(`[patterns] Extracted ${sigma.extracted} Sigma patterns for ${sigma.techniques} techniques`);
-  
-  const kql = extractKQLPatterns();
-  console.error(`[patterns] Extracted ${kql.extracted} KQL patterns for ${kql.techniques} techniques`);
-  
-  const elastic = extractElasticPatterns();
-  console.error(`[patterns] Extracted ${elastic.extracted} Elastic patterns for ${elastic.techniques} techniques`);
-  
-  const fields = extractFieldUsage();
-  console.error(`[patterns] Extracted ${fields.fields} field references across ${fields.dataModels} data models`);
-  
-  const macros = extractMacroUsage();
-  console.error(`[patterns] Extracted ${macros.macros} macro usage patterns`);
-  
-  const naming = extractNamingConventions();
-  console.error(`[patterns] Extracted ${naming.conventions} naming conventions`);
-  
-  const total = spl.extracted + sigma.extracted + kql.extracted + elastic.extracted;
-  console.error(`[patterns] Pattern extraction complete: ${total} total patterns`);
-  
-  // Also store summary as a learning
-  addLearning(
-    'pattern_extraction',
-    'Pattern extraction summary',
-    `Extracted patterns from indexed detections: ${spl.extracted} SPL, ${sigma.extracted} Sigma, ${kql.extracted} KQL, ${elastic.extracted} Elastic, ${fields.fields} fields, ${macros.macros} macros`,
-    JSON.stringify({ spl, sigma, kql, elastic, fields, macros, naming }),
-    'detection_generation'
-  );
-  
-  return {
-    spl_patterns: spl,
-    sigma_patterns: sigma,
-    kql_patterns: kql,
-    elastic_patterns: elastic,
-    field_usage: fields,
-    macro_usage: macros,
-    naming_conventions: naming,
-    total_patterns: total,
-  };
+  const database = getDb();
+  initPatternsSchema();
+  // Commit learned patterns, references, conventions and the summary together.
+  const result = database.transaction(() => {
+    console.error('[patterns] Starting pattern extraction...');
+
+    const spl = extractSPLPatterns();
+    console.error(`[patterns] Extracted ${spl.extracted} SPL patterns for ${spl.techniques} techniques`);
+
+    const sigma = extractSigmaPatterns();
+    console.error(`[patterns] Extracted ${sigma.extracted} Sigma patterns for ${sigma.techniques} techniques`);
+
+    const kql = extractKQLPatterns();
+    console.error(`[patterns] Extracted ${kql.extracted} KQL patterns for ${kql.techniques} techniques`);
+
+    const elastic = extractElasticPatterns();
+    console.error(`[patterns] Extracted ${elastic.extracted} Elastic patterns for ${elastic.techniques} techniques`);
+
+    const fields = extractFieldUsage();
+    console.error(`[patterns] Extracted ${fields.fields} field references across ${fields.dataModels} data models`);
+
+    const macros = extractMacroUsage();
+    console.error(`[patterns] Extracted ${macros.macros} macro usage patterns`);
+
+    const naming = extractNamingConventions();
+    console.error(`[patterns] Extracted ${naming.conventions} naming conventions`);
+
+    const total = spl.extracted + sigma.extracted + kql.extracted + elastic.extracted;
+
+    // Also store summary as a learning
+    addLearning(
+      'pattern_extraction',
+      'Pattern extraction summary',
+      `Extracted patterns from indexed detections: ${spl.extracted} SPL, ${sigma.extracted} Sigma, ${kql.extracted} KQL, ${elastic.extracted} Elastic, ${fields.fields} fields, ${macros.macros} macros`,
+      JSON.stringify({ spl, sigma, kql, elastic, fields, macros, naming }),
+      'detection_generation'
+    );
+
+    return {
+      spl_patterns: spl,
+      sigma_patterns: sigma,
+      kql_patterns: kql,
+      elastic_patterns: elastic,
+      field_usage: fields,
+      macro_usage: macros,
+      naming_conventions: naming,
+      total_patterns: total,
+    };
+  })();
+  console.error(`[patterns] Pattern extraction complete: ${result.total_patterns} total patterns`);
+  return result;
 }
 
 // =============================================================================
