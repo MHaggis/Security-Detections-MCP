@@ -839,10 +839,9 @@ async function buildDataDrivenResponse(userMessage: string, userId?: string): Pr
     const topicTechMatch = topic.match(/T\d{4}(?:\.\d{3})?/i);
     if (topicTechMatch) {
       const techId = topicTechMatch[0].toUpperCase();
-      const { data: detIds } = await sb.from('detection_techniques').select('detection_id').eq('technique_id', techId).limit(limit);
-      if (detIds?.length) {
-        const { data: dets } = await sb.from('detections').select('name, source_type, severity, query, mitre_ids, description')
-          .in('id', detIds.map(d => d.detection_id))
+      {
+        const { data: dets } = await query
+          .contains('mitre_ids', JSON.stringify([techId]))
           .order('name')
           .limit(limit);
 

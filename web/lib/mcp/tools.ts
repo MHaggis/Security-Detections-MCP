@@ -151,13 +151,14 @@ export function registerHostedTools(server: McpServer): void {
       description: 'Get full details for a single detection by its ID (Sigma UUID or Splunk/Elastic slug).',
       inputSchema: {
         id: z.string().min(1).describe('Detection ID'),
+        source_type: SOURCE_ENUM.optional().describe('Source format; required when an ID occurs in multiple sources'),
       },
       annotations: { title: 'Get Detection by ID', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
-    async ({ id }) =>
+    async ({ id, source_type }) =>
       safe('get_by_id', async () => {
-        const detection = await getDetectionById(id);
+        const detection = await getDetectionById(id, source_type);
         if (!detection) return err(`Detection not found: ${id}`, { hint: 'Use search() first to find valid IDs.' });
         return json(detection);
       }),
@@ -170,13 +171,14 @@ export function registerHostedTools(server: McpServer): void {
       description: 'Get the original YAML content for a detection (useful for copying the rule verbatim).',
       inputSchema: {
         id: z.string().min(1).describe('Detection ID'),
+        source_type: SOURCE_ENUM.optional().describe('Source format; required when an ID occurs in multiple sources'),
       },
       annotations: { title: 'Get Raw YAML', ...READ_ONLY_ANNOTATIONS },
       _meta: META,
     },
-    async ({ id }) =>
+    async ({ id, source_type }) =>
       safe('get_raw_yaml', async () => {
-        const yaml = await getRawYaml(id);
+        const yaml = await getRawYaml(id, source_type);
         if (!yaml) return err(`No raw YAML found for: ${id}`);
         return json({ id, yaml });
       }),

@@ -97,20 +97,11 @@ async function getActorCoverage(actorName: string) {
 async function getTechniqueCoverage(techniqueId: string) {
   const sb = getSupabase();
 
-  const { data: detTechRows } = await sb
-    .from('detection_techniques')
-    .select('detection_id')
-    .eq('technique_id', techniqueId);
-
-  const detIds = detTechRows?.map(d => d.detection_id) || [];
-  let detections: Array<{ id: string; name: string; source_type: string; severity: string | null }> = [];
-  if (detIds.length > 0) {
-    const { data } = await sb
-      .from('detections')
-      .select('id, name, source_type, severity')
-      .in('id', detIds.slice(0, 200));
-    detections = data || [];
-  }
+  const { data, count, error } = await sb.from('detections')
+    .select('id, name, source_type, severity', { count: 'exact' })
+    .contains('mitre_ids', JSON.stringify([techniqueId])).order('name').limit(200);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const detections = data || [];
 
   const { data: technique } = await sb
     .from('attack_techniques')
@@ -121,7 +112,7 @@ async function getTechniqueCoverage(techniqueId: string) {
   return NextResponse.json({
     technique_id: techniqueId,
     technique_name: technique?.name,
-    total_detections: detections.length,
+    total_detections: count ?? 0,
     detections,
   });
 }

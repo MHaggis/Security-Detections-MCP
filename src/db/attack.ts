@@ -204,7 +204,7 @@ export function getActorTechniques(actorId: string): ActorTechnique[] {
       at.technique_id,
       COALESCE(atk.name, at.technique_id) as technique_name,
       at.description,
-      COUNT(DISTINCT dt.detection_id) as detection_count
+      COUNT(dt.detection_id) as detection_count
     FROM actor_techniques at
     LEFT JOIN attack_techniques atk ON at.technique_id = atk.technique_id
     LEFT JOIN detection_techniques dt ON at.technique_id = dt.technique_id
@@ -257,11 +257,11 @@ export function getActorCoverage(actorId: string, sourceType?: string): ActorCov
         at.technique_id,
         COALESCE(atk.name, at.technique_id) as technique_name,
         at.description,
-        COUNT(DISTINCT dt.detection_id) as detection_count
+        COUNT(d.id) as detection_count
       FROM actor_techniques at
       LEFT JOIN attack_techniques atk ON at.technique_id = atk.technique_id
       LEFT JOIN detection_techniques dt ON at.technique_id = dt.technique_id
-      LEFT JOIN detections d ON dt.detection_id = d.id AND d.source_type = ?
+      LEFT JOIN detections d ON dt.detection_id = d.id AND dt.source_type = d.source_type AND d.source_type = ?
       WHERE at.actor_id = ?
       GROUP BY at.technique_id
       ORDER BY detection_count DESC
@@ -273,7 +273,7 @@ export function getActorCoverage(actorId: string, sourceType?: string): ActorCov
         at.technique_id,
         COALESCE(atk.name, at.technique_id) as technique_name,
         at.description,
-        COUNT(DISTINCT dt.detection_id) as detection_count
+        COUNT(dt.detection_id) as detection_count
       FROM actor_techniques at
       LEFT JOIN attack_techniques atk ON at.technique_id = atk.technique_id
       LEFT JOIN detection_techniques dt ON at.technique_id = dt.technique_id

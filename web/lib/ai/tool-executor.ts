@@ -70,27 +70,10 @@ async function getTechniqueCoverage(args: Record<string, string>): Promise<strin
   const techniqueId = args.technique_id;
   const sb = getSupabase();
 
-  // Get detection IDs for this technique
-  const { data: detTechRows } = await sb
-    .from('detection_techniques')
-    .select('detection_id')
-    .eq('technique_id', techniqueId);
-
-  const detIds = detTechRows?.map(d => d.detection_id) || [];
-
-  // Fetch detection details separately (no join)
+  const { data: counts, error } = await sb.rpc('get_technique_source_counts', { p_technique_id: techniqueId });
+  if (error) return JSON.stringify({ error: error.message });
   const sourceCounts: Record<string, number> = {};
-  if (detIds.length > 0) {
-    const { data: dets } = await sb
-      .from('detections')
-      .select('source_type')
-      .in('id', detIds.slice(0, 500));
-    if (dets) {
-      for (const d of dets) {
-        sourceCounts[d.source_type] = (sourceCounts[d.source_type] || 0) + 1;
-      }
-    }
-  }
+  for (const row of counts || []) sourceCounts[row.source_type] = Number(row.count);
 
   const { data: technique } = await sb
     .from('attack_techniques')
@@ -102,7 +85,7 @@ async function getTechniqueCoverage(args: Record<string, string>): Promise<strin
     technique_id: techniqueId,
     technique_name: technique?.name || 'Unknown',
     description: technique?.description?.substring(0, 300),
-    total_detections: detIds.length,
+    total_detections: Object.values(sourceCounts).reduce((sum, count) => sum + count, 0),
     by_source: sourceCounts,
     platforms: technique?.platforms,
   });
@@ -244,14 +227,6 @@ async function compareSources(args: Record<string, string>): Promise<string> {
   const techniqueId = args.technique_id;
   const sb = getSupabase();
 
-  // Get detection IDs, then fetch details separately (no join)
-  const { data: detTechRows } = await sb
-    .from('detection_techniques')
-    .select('detection_id')
-    .eq('technique_id', techniqueId);
-
-  const detIds = detTechRows?.map(d => d.detection_id) || [];
-
   const bySource: Record<string, { count: number; detections: string[] }> = {};
   const allSources = ['sigma', 'splunk_escu', 'elastic', 'kql', 'sublime', 'crowdstrike_cql', 'jamf_protect'];
 
@@ -259,20 +234,12 @@ async function compareSources(args: Record<string, string>): Promise<string> {
     bySource[src] = { count: 0, detections: [] };
   }
 
-  if (detIds.length > 0) {
-    const { data: dets } = await sb
-      .from('detections')
-      .select('name, source_type')
-      .in('id', detIds.slice(0, 500));
-    if (dets) {
-      for (const d of dets) {
-        if (bySource[d.source_type]) {
-          bySource[d.source_type].count++;
-          if (bySource[d.source_type].detections.length < 3) {
-            bySource[d.source_type].detections.push(d.name);
-          }
-        }
-      }
+  const { data: comparison, error } = await sb.rpc('compare_sources_for_technique', { p_technique_id: techniqueId });
+  if (error) return JSON.stringify({ error: error.message });
+  for (const row of comparison?.sources || []) {
+    if (bySource[row.source]) {
+      bySource[row.source].count = Number(row.count);
+      bySource[row.source].detections = (row.detections || []).slice(0, 3).map((d: { name: string }) => d.name);
     }
   }
 

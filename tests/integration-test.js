@@ -352,13 +352,13 @@ test('Pattern retrieval performance is acceptable (<200ms)', () => {
 // DATA QUALITY TESTS
 // =============================================================================
 
-test('No duplicate detection IDs', () => {
+test('No duplicate source-qualified detection IDs', () => {
   const db = getDb();
   const dupes = db.prepare(`
-    SELECT id, COUNT(*) as cnt FROM detections GROUP BY id HAVING cnt > 1
+    SELECT source_type, id, COUNT(*) as cnt FROM detections GROUP BY source_type, id HAVING cnt > 1
   `).all();
   
-  assert(dupes.length === 0, `Found ${dupes.length} duplicate IDs`);
+  assert(dupes.length === 0, `Found ${dupes.length} duplicate source-qualified IDs`);
 });
 
 test('MITRE technique IDs are valid format', () => {

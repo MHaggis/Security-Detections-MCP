@@ -32,17 +32,7 @@ export async function GET(request: NextRequest) {
     query = query.eq('severity', severity);
   }
   if (technique) {
-    // Use junction table via inner join
-    const { data: detectionIds } = await supabase
-      .from('detection_techniques')
-      .select('detection_id')
-      .eq('technique_id', technique);
-
-    if (detectionIds && detectionIds.length > 0) {
-      query = query.in('id', detectionIds.map(d => d.detection_id));
-    } else {
-      return NextResponse.json({ detections: [], total: 0 });
-    }
+    query = query.contains('mitre_ids', JSON.stringify([technique]));
   }
 
   const { data, count, error } = await query

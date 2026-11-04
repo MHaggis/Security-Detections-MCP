@@ -45,7 +45,13 @@ export function initDb(): Database.Database {
   db = new Database(DB_PATH);
   
   // Create all tables and indexes
-  createSchema(db);
+  try {
+    createSchema(db);
+  } catch (error) {
+    db.close();
+    db = null;
+    throw error;
+  }
   
   // Create knowledge graph tables
   createKnowledgeTables(db);
