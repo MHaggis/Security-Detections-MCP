@@ -37,7 +37,7 @@
         },
         {
           "name": "SUBLIME_PATHS",
-          "description": "Comma-separated paths to Sublime Security rule directories (e.g., /path/to/sublime-rules/detection-rules)"
+          "description": "Comma-separated paths to Sublime MQL rule directories (e.g., /path/to/sublime-rules/detection-rules,/path/to/delivr-detections/sublime-rules)"
         },
         {
           "name": "CQL_HUB_PATHS",

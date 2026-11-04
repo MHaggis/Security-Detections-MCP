@@ -47,6 +47,10 @@ jobs:
           git clone --depth 1 --filter=blob:none --sparse https://github.com/sublime-security/sublime-rules.git /tmp/repos/sublime
           cd /tmp/repos/sublime && git sparse-checkout set detection-rules && cd -
 
+          # delivr.to Sublime MQL rules (same format, indexed via SUBLIME_PATHS)
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/delivr-to/detections.git /tmp/repos/delivr
+          cd /tmp/repos/delivr && git sparse-checkout set sublime-rules && cd -
+
           # CrowdStrike CQL Hub
           git clone --depth 1 https://github.com/ByteRay-Labs/Query-Hub.git /tmp/repos/cql-hub
 
@@ -68,7 +72,7 @@ jobs:
           STORY_PATHS: /tmp/repos/splunk/stories
           ELASTIC_PATHS: /tmp/repos/elastic/rules
           KQL_PATHS: /tmp/repos/kql-bertjanp,/tmp/repos/kql-jkerai1
-          SUBLIME_PATHS: /tmp/repos/sublime/detection-rules
+          SUBLIME_PATHS: /tmp/repos/sublime/detection-rules,/tmp/repos/delivr/sublime-rules
           CQL_HUB_PATHS: /tmp/repos/cql-hub/queries
           JAMF_PROTECT_PATHS: /tmp/repos/jamfprotect/custom_analytic_detections
           ATTACK_STIX_PATH: /tmp/repos/stix/enterprise-attack/enterprise-attack.json
