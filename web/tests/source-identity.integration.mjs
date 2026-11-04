@@ -152,7 +152,7 @@ try {
     INSERT INTO detections VALUES('collision','Seed Sigma','sigma','["T2001"]'),('collision','Seed Elastic','elastic','["T2002"]');
     CREATE TABLE technique_tactics(technique_id TEXT,tactic_name TEXT,source TEXT);`);
   const seed=()=>promisify(execFile)(process.execPath,['--experimental-strip-types',new URL('../scripts/seed-from-sqlite.ts',import.meta.url).pathname],{
-    env:{...process.env,DETECTIONS_DB_PATH:fixture},timeout:60000});
+    env:{...process.env,CATALOG_SEED_TRANSPORT:'http',DETECTIONS_DB_PATH:fixture},timeout:60000});
   await seed(); await seed();
   assert.equal((await good(service.from('detections').select('*'))).length,2);
   assert.deepEqual((await good(service.from('detection_techniques').select('source_type,technique_id').order('source_type'))),[{source_type:'elastic',technique_id:'T2002'},{source_type:'sigma',technique_id:'T2001'}]);
