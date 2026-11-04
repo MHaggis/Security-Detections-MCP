@@ -18,8 +18,9 @@ import { initDb, getDb, dbExists, recreateDb, closeDb, getDbPath, getCacheDir } 
 import { getDbPath as getLegacyDbPath, initDb as initIndexerDb } from '../dist/db.js';
 import { indexDetections, needsIndexing } from '../dist/indexer.js';
 import { fileURLToPath } from 'url';
-import { initPatternsSchema } from '../dist/db/patterns.js';
+import { initPatternsSchema, extractAllPatterns } from '../dist/db/patterns.js';
 import { existsSync } from 'fs';
+import Database from 'better-sqlite3';
 import { platform } from 'os';
 import { sep } from 'path';
 
@@ -229,6 +230,123 @@ test('Indexing closes existing query and indexer handles before replacing the da
   assert(getDb().prepare('SELECT COUNT(*) AS count FROM detections').get().count === 3,
     'Reopened query connection must read the replacement database');
   // Check indexDetections cleanup before needsIndexing can close a leaked handle.
+  recreateDb();
+});
+
+test('Index build commits native rows, FTS and source-qualified links together', () => {
+  const sigmaPath = fileURLToPath(new URL('./fixtures/source-identity/sigma', import.meta.url));
+  const elasticPath = fileURLToPath(new URL('./fixtures/source-identity/elastic', import.meta.url));
+  const result = indexDetections([sigmaPath], [], [], [elasticPath]);
+  assert(result.sigma_indexed === 1 && result.elastic_indexed === 1 && result.total === 2,
+    'Both colliding source rules must commit with accurate counters');
+  const database = getDb();
+  assert(database.prepare('SELECT COUNT(*) n FROM detections').get().n === 2, 'Both rows must persist');
+  assert(database.prepare("SELECT COUNT(*) n FROM detections_fts WHERE detections_fts MATCH 'FastPass'").get().n === 2,
+    'Both rows must be searchable after commit');
+  assert(database.prepare('SELECT COUNT(DISTINCT source_type) n FROM detection_techniques').get().n === 2,
+    'Both sources must have materialized technique links');
+});
+
+test('Unexpected traversal errors roll back writes; missing paths and rejected rules remain compatible', () => {
+  const sigmaPath = fileURLToPath(new URL('./fixtures/source-identity/sigma', import.meta.url));
+  const regularFile = fileURLToPath(new URL('./fixtures/source-identity/sigma/okta_fastpass_phishing_detection.yml', import.meta.url));
+  let failure;
+  try {
+    indexDetections([sigmaPath, regularFile], []);
+  } catch (error) {
+    failure = error;
+  }
+  assert(failure?.code === 'ENOTDIR', 'Traversing a regular file as a directory must propagate its I/O error');
+  assert(getDb().prepare('SELECT COUNT(*) n FROM detections').get().n === 0, 'Earlier source writes must roll back');
+  const rejectedRules = fileURLToPath(new URL('./fixtures/jamf_protect', import.meta.url));
+  const result = indexDetections([`${getCacheDir()}/missing-optional-source`, sigmaPath, rejectedRules], []);
+  assert(result.sigma_indexed === 1 && result.sigma_failed === 3, 'Missing paths skip; parser rejection counters remain accurate');
+  assert(getDb().prepare('SELECT COUNT(*) n FROM detections').get().n === 1, 'Valid row must commit despite expected parser rejection');
+  recreateDb();
+});
+
+test('Unexpected SQLite error rolls back earlier writes and a subsequent rebuild succeeds', () => {
+  const fixturePath = fileURLToPath(new URL('./fixtures/jamf_protect', import.meta.url));
+  const originalPrepare = Database.prototype.prepare;
+  let completedWrites = 0;
+  let failure;
+  Database.prototype.prepare = function(sql) {
+    const statement = originalPrepare.call(this, sql);
+    if (/INSERT INTO detections\s/i.test(sql)) {
+      const originalRun = statement.run;
+      const database = this;
+      statement.run = function(...args) {
+        if (completedWrites === 1) {
+          // A real SQLite failure after an earlier successful row + FTS + edge write.
+          database.exec('INSERT INTO deliberately_missing_index_test_table VALUES (1)');
+        }
+        const result = originalRun.apply(this, args);
+        completedWrites++;
+        return result;
+      };
+    }
+    return statement;
+  };
+  try {
+    indexDetections([], [], [], [], [], [], [], [fixturePath]);
+  } catch (error) {
+    failure = error;
+  } finally {
+    Database.prototype.prepare = originalPrepare;
+  }
+  assert(failure?.code === 'SQLITE_ERROR', 'Native SQLite error must propagate');
+  assert(completedWrites === 1, 'Failure must occur after exactly one successful write');
+  const database = getDb();
+  assert(database.prepare('SELECT COUNT(*) n FROM detections').get().n === 0, 'No partially built detection rows may remain');
+  assert(database.prepare('SELECT COUNT(*) n FROM detections_fts').get().n === 0, 'No partially built FTS rows may remain');
+  assert(database.prepare('SELECT COUNT(*) n FROM detection_techniques').get().n === 0, 'No partially built edges may remain');
+  assert(needsIndexing(), 'Failed empty replacement must be recognized as requiring a rebuild');
+  const retry = indexDetections([], [], [], [], [], [], [], [fixturePath]);
+  assert(retry.jamf_protect_indexed === 3 && retry.total === 3, 'A subsequent rebuild must succeed');
+  assert(getDb().prepare('SELECT COUNT(*) n FROM detections').get().n === 3, 'Retry must persist all rows');
+  recreateDb();
+});
+
+test('Pattern extraction rolls back partial writes and preserves existing patterns', () => {
+  const sigmaPath = fileURLToPath(new URL('./fixtures/source-identity/sigma', import.meta.url));
+  const elasticPath = fileURLToPath(new URL('./fixtures/source-identity/elastic', import.meta.url));
+  indexDetections([sigmaPath], [], [], [elasticPath]);
+  const database = getDb();
+  initPatternsSchema();
+  database.exec("INSERT INTO detection_patterns(id,pattern_type,pattern_content) VALUES ('existing','manual','{}')");
+  database.exec("CREATE TEMP TRIGGER fail_pattern_summary BEFORE INSERT ON kg_learnings BEGIN SELECT RAISE(ABORT, 'forced late pattern summary failure'); END");
+  const originalPrepare = Database.prototype.prepare;
+  let completedWrites = 0;
+  let failure;
+  Database.prototype.prepare = function(sql) {
+    const statement = originalPrepare.call(this, sql);
+    if (/INSERT INTO detection_patterns\s/i.test(sql)) {
+      const originalRun = statement.run;
+      statement.run = function(...args) {
+        const result = originalRun.apply(this, args);
+        completedWrites++;
+        return result;
+      };
+    }
+    return statement;
+  };
+  try {
+    extractAllPatterns();
+  } catch (error) {
+    failure = error;
+  } finally {
+    Database.prototype.prepare = originalPrepare;
+  }
+  assert(failure?.code === 'SQLITE_CONSTRAINT_TRIGGER' && completedWrites >= 2, 'Native failure must occur after multiple inserted patterns');
+  assert(database.prepare('SELECT COUNT(*) n FROM detection_patterns').get().n === 1, 'New partial patterns must roll back');
+  assert(database.prepare("SELECT id FROM detection_patterns WHERE id='existing'").get(), 'Existing pattern must remain');
+  assert(database.prepare('SELECT COUNT(*) n FROM kg_learnings').get().n === 0, 'Failed extraction must not publish a completion learning');
+  assert(database.prepare('SELECT COUNT(*) n FROM style_conventions').get().n === 0, 'Partial conventions must roll back');
+  database.exec('DROP TRIGGER fail_pattern_summary');
+  const retry = extractAllPatterns();
+  assert(retry.total_patterns >= 2, 'Subsequent extraction must succeed');
+  assert(database.prepare('SELECT COUNT(*) n FROM detection_patterns').get().n > 1, 'Successful patterns must persist');
+  assert(database.prepare('SELECT COUNT(*) n FROM kg_learnings').get().n === 1, 'Successful summary must commit');
   recreateDb();
 });
 

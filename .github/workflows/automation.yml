@@ -1,0 +1,39 @@
+name: Automation queue
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths: ['automation/**', 'agents/**', 'src/**', 'package.json', 'package-lock.json', '.github/workflows/automation.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Queue and real agents adapter (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            agents/package-lock.json
+            automation/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci --prefix agents
+      - run: npm run build --prefix agents
+      - run: npm ci --prefix automation
+      - run: npm run typecheck --prefix automation
+      - run: npm test --prefix automation
+      - run: npm run test:agents --prefix automation
+      - run: npm audit --prefix automation --audit-level=moderate

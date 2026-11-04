@@ -1,31 +1,120 @@
-name: Publish to npm
-
+name: Publish npm package
 on:
   release:
     types: [published]
-
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: public-release
+  cancel-in-progress: false
 jobs:
-  publish:
+  test-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify release identity, main ancestry and all required CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/prepare-release.mjs
+      - run: node scripts/release/check-unpublished.mjs
+      - run: npm ci
+      - run: npm run release:verify -- "$GITHUB_REF_NAME"
+      - run: npm run lint
+      - run: npm audit
+      - run: npm run test:release
+      - run: npm run build
+      - name: Test platform, parser and MCP behavior
+        run: |
+          node tests/cross-platform-test.js
+          for test in tests/*-parser-test.js; do node "$test"; done
+          node tests/mcp-smoke-test.js
+      - name: Pack and test the exact production artifact
+        run: npm run test:package -- --output release-assets
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-release-${{ github.ref_name }}
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 90
+  publish-npm:
+    needs: test-package
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Pin npm with trusted publishing support
+        run: npm install --global npm@11.12.0
+      - name: Validate release metadata and CI again
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/prepare-release.mjs
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm-release-${{ github.ref_name }}
+          path: release-assets
+      - name: Publish verified tarball with npm trusted publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/publish-artifact.mjs
+  publish-registry:
+    needs: publish-npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Publish to npm
-        run: npm publish --access public --provenance
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Materialize the released Registry version
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/prepare-release.mjs
+      - name: Wait for the exact npm version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for attempt in {1..60}; do
+            npm view "security-detections-mcp@${version}" version && exit 0
+            echo "Waiting for npm availability (${attempt}/60)"
+            sleep 5
+          done
+          exit 1
+      - name: Download pinned MCP publisher and verify archive
+        env:
+          MCP_PUBLISHER_VERSION: '1.8.1'
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" -o mcp-publisher.tar.gz
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum --check
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+      - name: Publish to MCP Registry using GitHub identity
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish server.json

@@ -144,8 +144,8 @@ export default async function TechniqueDetailPage({
         <div className="space-y-2">
           {detections.map(d => (
             <Link
-              key={d.id}
-              href={`/explore/${encodeURIComponent(d.id)}`}
+              key={JSON.stringify([d.source_type, d.id])}
+              href={`/explore/${encodeURIComponent(d.id)}?source_type=${encodeURIComponent(d.source_type)}`}
               className="bg-card hover:bg-card2 border border-border hover:border-border-bright rounded-[var(--radius-card)] p-3 block transition-all group"
             >
               <div className="flex items-center justify-between">

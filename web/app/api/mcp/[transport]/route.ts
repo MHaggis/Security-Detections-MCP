@@ -31,16 +31,10 @@ const handler = createMcpHandler(
     },
     instructions:
       'Hosted Security Detections MCP. Read-only access to ~8,000 detections from Sigma, Splunk ESCU, Elastic, KQL, Sublime, CrowdStrike CQL, and Jamf Protect (macOS). Start with get_stats() and get_coverage_summary(), then drill down with search, list_by_mitre, or analyze_actor_coverage.',
-  },
-  {
-    basePath: '/api/mcp',
-    maxDuration: 60,
     verboseLogs: false,
-    // Explicit stateless mode per MCP 2025-11-25 Streamable HTTP:
-    // no session cookies, no Mcp-Session-Id emitted, every request
-    // independent. Fits Vercel serverless natively — no Redis needed.
-    sessionIdGenerator: undefined,
-    disableSse: true,
+    // SDK v2 is stateless and supports 2025 Streamable HTTP clients too.
+    // Hosted tools do not offer subscription streams.
+    maxSubscriptions: 0,
   },
 );
 
@@ -50,6 +44,11 @@ async function withAuth(request: Request): Promise<Response> {
   // The MCP SDK handler validates and dispatches. We don't need to
   // propagate auth context into tools because all hosted tools are
   // read-only over shared public data.
+  // Handler v2 delegates URL routing to the host framework. Preserve the
+  // published transport URL instead of serving MCP at arbitrary suffixes.
+  if (new URL(request.url).pathname !== '/api/mcp/mcp') {
+    return new Response('Not found', { status: 404 });
+  }
   return handler(request);
 }
 

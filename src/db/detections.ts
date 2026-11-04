@@ -1,3 +1,4 @@
+import { findDetectionRow, upsertDetection } from './identity.js';
 /**
  * Detections Database Module
  * 
@@ -175,81 +176,22 @@ function rowToListItem(row: Record<string, unknown>): DetectionListItem {
  * Insert or replace a detection in the database.
  */
 export function insertDetection(detection: Detection): void {
-  const database = getDb();
-  
-  const stmt = database.prepare(`
-    INSERT OR REPLACE INTO detections
-    (id, name, description, query, source_type, mitre_ids, logsource_category,
-     logsource_product, logsource_service, severity, status, author,
-     date_created, date_modified, refs, falsepositives, tags, file_path, raw_yaml,
-     cves, analytic_stories, data_sources, detection_type, asset_type, security_domain,
-     process_names, file_paths, registry_paths, mitre_tactics, platforms, kql_category, kql_tags, kql_keywords,
-     sublime_attack_types, sublime_detection_methods, sublime_tactics)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(
-    detection.id,
-    detection.name,
-    detection.description,
-    detection.query,
-    detection.source_type,
-    JSON.stringify(detection.mitre_ids),
-    detection.logsource_category,
-    detection.logsource_product,
-    detection.logsource_service,
-    detection.severity,
-    detection.status,
-    detection.author,
-    detection.date_created,
-    detection.date_modified,
-    JSON.stringify(detection.references),
-    JSON.stringify(detection.falsepositives),
-    JSON.stringify(detection.tags),
-    detection.file_path,
-    detection.raw_yaml,
-    JSON.stringify(detection.cves),
-    JSON.stringify(detection.analytic_stories),
-    JSON.stringify(detection.data_sources),
-    detection.detection_type,
-    detection.asset_type,
-    detection.security_domain,
-    JSON.stringify(detection.process_names),
-    JSON.stringify(detection.file_paths),
-    JSON.stringify(detection.registry_paths),
-    JSON.stringify(detection.mitre_tactics),
-    JSON.stringify(detection.platforms),
-    detection.kql_category,
-    JSON.stringify(detection.kql_tags),
-    JSON.stringify(detection.kql_keywords),
-    JSON.stringify(detection.sublime_attack_types),
-    JSON.stringify(detection.sublime_detection_methods),
-    JSON.stringify(detection.sublime_tactics)
-  );
+  upsertDetection(getDb(), detection);
 }
 
 /**
  * Get a detection by its ID.
  */
-export function getDetectionById(id: string): Detection | null {
-  const database = getDb();
-  
-  const stmt = database.prepare('SELECT * FROM detections WHERE id = ?');
-  const row = stmt.get(id) as Record<string, unknown> | undefined;
-  
+export function getDetectionById(id: string, sourceType?: string): Detection | null {
+  const row = findDetectionRow(getDb(), id, sourceType);
   return row ? rowToDetection(row) : null;
 }
 
 /**
  * Get the raw YAML content for a detection.
  */
-export function getRawYaml(id: string): string | null {
-  const database = getDb();
-  
-  const stmt = database.prepare('SELECT raw_yaml FROM detections WHERE id = ?');
-  const row = stmt.get(id) as { raw_yaml: string } | undefined;
-  
-  return row?.raw_yaml || null;
+export function getRawYaml(id: string, sourceType?: string): string | null {
+  return (findDetectionRow(getDb(), id, sourceType)?.raw_yaml as string) || null;
 }
 
 /**
@@ -318,7 +260,7 @@ export function listByMitre(techniqueId: string, limit: number = 100, offset: nu
     if (check) {
       const rows = database.prepare(`
         SELECT d.* FROM detections d
-        JOIN detection_techniques dt ON d.id = dt.detection_id
+        JOIN detection_techniques dt ON d.id = dt.detection_id AND d.source_type = dt.source_type
         WHERE dt.technique_id = ?
         ORDER BY d.name
         LIMIT ? OFFSET ?
@@ -839,7 +781,7 @@ export function getTechniqueIds(filters: TechniqueIdFilters = {}): string[] {
 export function analyzeCoverage(sourceType?: 'sigma' | 'splunk_escu' | 'elastic' | 'kql' | 'sublime' | 'crowdstrike_cql' | 'jamf_protect'): CoverageReport {
   const database = getDb();
   
-  let countSql = 'SELECT COUNT(DISTINCT id) as count FROM detections';
+  let countSql = 'SELECT COUNT(*) as count FROM detections';
   if (sourceType) countSql += ' WHERE source_type = ?';
   const totalDetections = sourceType 
     ? (database.prepare(countSql).get(sourceType) as { count: number }).count
@@ -1414,11 +1356,11 @@ export function populateJunctionTables(): { detection_techniques: number; techni
   const database = getDb();
 
   const rows = database.prepare(
-    "SELECT id, mitre_ids, mitre_tactics FROM detections WHERE mitre_ids IS NOT NULL AND mitre_ids != '[]'"
-  ).all() as { id: string; mitre_ids: string; mitre_tactics: string }[];
+    "SELECT source_type, id, mitre_ids, mitre_tactics FROM detections WHERE mitre_ids IS NOT NULL AND mitre_ids != '[]'"
+  ).all() as { source_type: string; id: string; mitre_ids: string; mitre_tactics: string }[];
 
   const dtStmt = database.prepare(
-    'INSERT OR IGNORE INTO detection_techniques (detection_id, technique_id) VALUES (?, ?)'
+    'INSERT OR IGNORE INTO detection_techniques (source_type, detection_id, technique_id) VALUES (?, ?, ?)'
   );
   const ttStmt = database.prepare(
     "INSERT OR IGNORE INTO technique_tactics (technique_id, tactic_name, source) VALUES (?, ?, 'detection')"
@@ -1428,11 +1370,12 @@ export function populateJunctionTables(): { detection_techniques: number; techni
   let ttCount = 0;
 
   const batch = database.transaction(() => {
+    database.exec("DELETE FROM detection_techniques; DELETE FROM technique_tactics WHERE source = 'detection'");
     for (const row of rows) {
       const ids = safeJsonParse<string[]>(row.mitre_ids, []);
       const tactics = safeJsonParse<string[]>(row.mitre_tactics, []);
       for (const techId of ids) {
-        dtStmt.run(row.id, techId);
+        dtStmt.run(row.source_type, row.id, techId);
         dtCount++;
         for (const tactic of tactics) {
           ttStmt.run(techId, tactic);

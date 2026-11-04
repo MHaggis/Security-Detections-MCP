@@ -32,12 +32,14 @@ function findYamlFiles(dir: string): string[] {
             files.push(fullPath);
           }
         }
-      } catch {
-        // Skip files we can't stat
+      } catch (error) {
+        // A file can disappear during traversal; other I/O failures abort the build.
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
     }
-  } catch {
-    // Skip directories we can't read
+  } catch (error) {
+    // Optional/missing source paths remain compatible; do not hide I/O failures.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   
   return files;
@@ -67,12 +69,14 @@ function findTomlFiles(dir: string): string[] {
             files.push(fullPath);
           }
         }
-      } catch {
-        // Skip files we can't stat
+      } catch (error) {
+        // A file can disappear during traversal; other I/O failures abort the build.
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
     }
-  } catch {
-    // Skip directories we can't read
+  } catch (error) {
+    // Optional/missing source paths remain compatible; do not hide I/O failures.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   
   return files;
@@ -117,12 +121,14 @@ function findKqlFiles(dir: string): KqlFiles {
             files.raw.push(fullPath);
           }
         }
-      } catch {
-        // Skip files we can't stat
+      } catch (error) {
+        // A file can disappear during traversal; other I/O failures abort the build.
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
     }
-  } catch {
-    // Skip directories we can't read
+  } catch (error) {
+    // Optional/missing source paths remain compatible; do not hide I/O failures.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   
   return files;
@@ -181,176 +187,180 @@ function buildIndex(
 ): IndexResult {
   // Recreate DB to ensure schema is up to date
   recreateDb();
-  initDb();
+  const database = initDb();
 
-  let sigma_indexed = 0;
-  let sigma_failed = 0;
-  let splunk_indexed = 0;
-  let splunk_failed = 0;
-  let elastic_indexed = 0;
-  let elastic_failed = 0;
-  let kql_indexed = 0;
-  let kql_failed = 0;
-  let sublime_indexed = 0;
-  let sublime_failed = 0;
-  let cql_hub_indexed = 0;
-  let cql_hub_failed = 0;
-  let jamf_protect_indexed = 0;
-  let jamf_protect_failed = 0;
-  let stories_indexed = 0;
-  let stories_failed = 0;
+  // One durable commit for the whole replacement index. Unexpected write or I/O
+  // errors roll back every new row; the old cache was already removed above.
+  return database.transaction(() => {
+    let sigma_indexed = 0;
+    let sigma_failed = 0;
+    let splunk_indexed = 0;
+    let splunk_failed = 0;
+    let elastic_indexed = 0;
+    let elastic_failed = 0;
+    let kql_indexed = 0;
+    let kql_failed = 0;
+    let sublime_indexed = 0;
+    let sublime_failed = 0;
+    let cql_hub_indexed = 0;
+    let cql_hub_failed = 0;
+    let jamf_protect_indexed = 0;
+    let jamf_protect_failed = 0;
+    let stories_indexed = 0;
+    let stories_failed = 0;
   
-  // Index Sigma rules
-  for (const basePath of sigmaPaths) {
-    const files = findYamlFiles(basePath);
+    // Index Sigma rules
+    for (const basePath of sigmaPaths) {
+      const files = findYamlFiles(basePath);
     
-    for (const file of files) {
-      const detection = parseSigmaFile(file);
-      if (detection) {
-        insertDetection(detection);
-        sigma_indexed++;
-      } else {
-        sigma_failed++;
+      for (const file of files) {
+        const detection = parseSigmaFile(file);
+        if (detection) {
+          insertDetection(detection);
+          sigma_indexed++;
+        } else {
+          sigma_failed++;
+        }
       }
     }
-  }
   
-  // Index Splunk ESCU detections
-  for (const basePath of splunkPaths) {
-    const files = findYamlFiles(basePath);
+    // Index Splunk ESCU detections
+    for (const basePath of splunkPaths) {
+      const files = findYamlFiles(basePath);
     
-    for (const file of files) {
-      const detection = parseSplunkFile(file);
-      if (detection) {
-        insertDetection(detection);
-        splunk_indexed++;
-      } else {
-        splunk_failed++;
+      for (const file of files) {
+        const detection = parseSplunkFile(file);
+        if (detection) {
+          insertDetection(detection);
+          splunk_indexed++;
+        } else {
+          splunk_failed++;
+        }
       }
     }
-  }
   
-  // Index Elastic detection rules (TOML format)
-  for (const basePath of elasticPaths) {
-    const files = findTomlFiles(basePath);
+    // Index Elastic detection rules (TOML format)
+    for (const basePath of elasticPaths) {
+      const files = findTomlFiles(basePath);
     
-    for (const file of files) {
-      const detection = parseElasticFile(file);
-      if (detection) {
-        insertDetection(detection);
-        elastic_indexed++;
-      } else {
-        elastic_failed++;
+      for (const file of files) {
+        const detection = parseElasticFile(file);
+        if (detection) {
+          insertDetection(detection);
+          elastic_indexed++;
+        } else {
+          elastic_failed++;
+        }
       }
     }
-  }
   
-  // Index KQL hunting queries (markdown and raw .kql formats)
-  for (const basePath of kqlPaths) {
-    const files = findKqlFiles(basePath);
+    // Index KQL hunting queries (markdown and raw .kql formats)
+    for (const basePath of kqlPaths) {
+      const files = findKqlFiles(basePath);
     
-    // Parse markdown files (Bert-JanP format)
-    for (const file of files.markdown) {
-      const detection = parseKqlFile(file, basePath);
-      if (detection) {
-        insertDetection(detection);
-        kql_indexed++;
-      } else {
-        kql_failed++;
+      // Parse markdown files (Bert-JanP format)
+      for (const file of files.markdown) {
+        const detection = parseKqlFile(file, basePath);
+        if (detection) {
+          insertDetection(detection);
+          kql_indexed++;
+        } else {
+          kql_failed++;
+        }
+      }
+    
+      // Parse raw .kql files (jkerai1 format)
+      for (const file of files.raw) {
+        const detection = parseRawKqlFile(file, basePath);
+        if (detection) {
+          insertDetection(detection);
+          kql_indexed++;
+        } else {
+          kql_failed++;
+        }
       }
     }
-    
-    // Parse raw .kql files (jkerai1 format)
-    for (const file of files.raw) {
-      const detection = parseRawKqlFile(file, basePath);
-      if (detection) {
-        insertDetection(detection);
-        kql_indexed++;
-      } else {
-        kql_failed++;
-      }
-    }
-  }
   
-  // Index Sublime Security rules (YAML with MQL source)
-  for (const basePath of sublimePaths) {
-    const files = findYamlFiles(basePath);
+    // Index Sublime Security rules (YAML with MQL source)
+    for (const basePath of sublimePaths) {
+      const files = findYamlFiles(basePath);
 
-    for (const file of files) {
-      const detection = parseSublimeFile(file);
-      if (detection) {
-        insertDetection(detection);
-        sublime_indexed++;
-      } else {
-        sublime_failed++;
+      for (const file of files) {
+        const detection = parseSublimeFile(file);
+        if (detection) {
+          insertDetection(detection);
+          sublime_indexed++;
+        } else {
+          sublime_failed++;
+        }
       }
     }
-  }
 
-  // Index CQL Hub queries (CrowdStrike Query Language)
-  for (const basePath of cqlHubPaths) {
-    const files = findYamlFiles(basePath);
+    // Index CQL Hub queries (CrowdStrike Query Language)
+    for (const basePath of cqlHubPaths) {
+      const files = findYamlFiles(basePath);
 
-    for (const file of files) {
-      const detection = parseCqlHubFile(file);
-      if (detection) {
-        insertDetection(detection);
-        cql_hub_indexed++;
-      } else {
-        cql_hub_failed++;
+      for (const file of files) {
+        const detection = parseCqlHubFile(file);
+        if (detection) {
+          insertDetection(detection);
+          cql_hub_indexed++;
+        } else {
+          cql_hub_failed++;
+        }
       }
     }
-  }
 
-  // Index Jamf Protect custom analytic detections (YAML with NSPredicate filter)
-  for (const basePath of jamfProtectPaths) {
-    const files = findYamlFiles(basePath);
+    // Index Jamf Protect custom analytic detections (YAML with NSPredicate filter)
+    for (const basePath of jamfProtectPaths) {
+      const files = findYamlFiles(basePath);
 
-    for (const file of files) {
-      const detection = parseJamfProtectFile(file);
-      if (detection) {
-        insertDetection(detection);
-        jamf_protect_indexed++;
-      } else {
-        jamf_protect_failed++;
+      for (const file of files) {
+        const detection = parseJamfProtectFile(file);
+        if (detection) {
+          insertDetection(detection);
+          jamf_protect_indexed++;
+        } else {
+          jamf_protect_failed++;
+        }
       }
     }
-  }
 
-  // Index Splunk Analytic Stories (optional)
-  for (const basePath of storyPaths) {
-    const files = findYamlFiles(basePath);
+    // Index Splunk Analytic Stories (optional)
+    for (const basePath of storyPaths) {
+      const files = findYamlFiles(basePath);
     
-    for (const file of files) {
-      const story = parseStoryFile(file);
-      if (story) {
-        insertStory(story);
-        stories_indexed++;
-      } else {
-        stories_failed++;
+      for (const file of files) {
+        const story = parseStoryFile(file);
+        if (story) {
+          insertStory(story);
+          stories_indexed++;
+        } else {
+          stories_failed++;
+        }
       }
     }
-  }
   
-  return {
-    sigma_indexed,
-    sigma_failed,
-    splunk_indexed,
-    splunk_failed,
-    elastic_indexed,
-    elastic_failed,
-    kql_indexed,
-    kql_failed,
-    sublime_indexed,
-    sublime_failed,
-    cql_hub_indexed,
-    cql_hub_failed,
-    jamf_protect_indexed,
-    jamf_protect_failed,
-    stories_indexed,
-    stories_failed,
-    total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed + sublime_indexed + cql_hub_indexed + jamf_protect_indexed,
-  };
+    return {
+      sigma_indexed,
+      sigma_failed,
+      splunk_indexed,
+      splunk_failed,
+      elastic_indexed,
+      elastic_failed,
+      kql_indexed,
+      kql_failed,
+      sublime_indexed,
+      sublime_failed,
+      cql_hub_indexed,
+      cql_hub_failed,
+      jamf_protect_indexed,
+      jamf_protect_failed,
+      stories_indexed,
+      stories_failed,
+      total: sigma_indexed + splunk_indexed + elastic_indexed + kql_indexed + sublime_indexed + cql_hub_indexed + jamf_protect_indexed,
+    };
+  })();
 }
 
 export function needsIndexing(): boolean {

@@ -15,7 +15,7 @@
  */
 
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 import { ctiAnalystNode } from '../nodes/cti-analyst.js';
 import { coverageAnalyzerNode } from '../nodes/coverage-analyzer.js';
@@ -221,7 +221,7 @@ export function createInitialState(
     atomic_tests: [],
     attack_data_paths: [],
     prs: [],
-    workflow_id: uuidv4(),
+    workflow_id: randomUUID(),
     current_step: 'initialized',
     errors: [],
     started_at: new Date().toISOString(),

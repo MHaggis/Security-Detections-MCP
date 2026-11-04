@@ -1,0 +1,37 @@
+name: Release after main CI
+on:
+  workflow_run:
+    workflows: [CI - Build and Test, Agents CLI - Smoke Tests, Automation queue, Hosted database security, Release validation]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: automatic-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: >-
+      github.repository == 'MHaggis/Security-Detections-MCP' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Release only the current main commit after every required workflow passes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/auto-release.mjs

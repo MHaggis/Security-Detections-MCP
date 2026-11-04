@@ -20,7 +20,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "test": "npm run build && node tests/cross-platform-test.js && node tests/jamf-parser-test.js && node tests/sublime-parser-test.js && node tests/splunk-parser-test.js && node tests/mcp-smoke-test.js && node tests/integration-test.js && node tests/engineering-tools-test.js",
+    "test": "npm run build && node tests/cross-platform-test.js && node tests/source-identity-test.js && node tests/jamf-parser-test.js && node tests/sublime-parser-test.js && node tests/splunk-parser-test.js && node tests/mcp-smoke-test.js && node tests/integration-test.js && node tests/engineering-tools-test.js",
     "test:platform": "npm run build && node tests/cross-platform-test.js",
     "test:ci": "npm run build && node tests/ci-integration-test.js",
     "test:integration": "npm run build && node tests/integration-test.js",
@@ -29,7 +29,12 @@
     "test:mcp": "npm run build && node tests/mcp-smoke-test.js",
     "lint": "tsc --noEmit --strict",
     "prepublishOnly": "npm run build && npm run lint",
-    "test:sublime": "npm run build && node tests/sublime-parser-test.js"
+    "test:identity": "npm run build && node tests/source-identity-test.js",
+    "test:sublime": "npm run build && node tests/sublime-parser-test.js",
+    "version": "node scripts/release/sync-version.mjs",
+    "release:verify": "node scripts/release/verify-release.mjs",
+    "test:release": "node --test scripts/release/*.test.mjs",
+    "test:package": "node scripts/release/package-smoke.mjs"
   },
   "keywords": [
     "mcp",
@@ -71,5 +76,6 @@
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "mcpName": "io.github.mhaggis/security-detections-mcp"
 }
