@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["*.ts", "collectors/**/*.ts", "runners/**/*.ts", "hitl/**/*.ts", "reports/**/*.ts", "notifications/**/*.ts"],
+  "exclude": ["dist", "node_modules", "tests"]
+}

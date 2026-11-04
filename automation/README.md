@@ -1,666 +1,75 @@
-# Security Detections MCP 3.0 - Autonomous Detection Engineering Platform
+# Detection automation queue
 
-Transform threat intelligence into validated detections automatically using Cursor Subagents.
+This package collects threat reports into a dedicated SQLite queue and invokes the compiled [`agents/`](../agents/) CLI. It replaces the legacy placeholder that marked empty work completed.
 
-## What This Does
+The supported default is **disabled**. Dry runs exercise the adapter and queue using synthetic agent output. Live mode is experimental and can run Attack Range tests, query Splunk, and write detection/data artifacts. A live result requires evidence and human review; this queue never publishes or merges PRs.
 
-This system continuously:
-1. **Ingests** threat intel from CISA, MITRE, vendor blogs
-2. **Analyzes** for MITRE ATT&CK techniques and coverage gaps
-3. **Creates** Splunk detection YAMLs matching repo conventions
-4. **Validates** detections via Atomic Red Team tests in Attack Range
-5. **Dumps** validated attack data for future testing
-6. **Stages** dual DRAFT PRs to security_content and attack_data repos
-7. **Learns** from validation results to improve over time
+## Install and verify
 
-**No auto-merging. Human review required.**
+Use Node 22.13+ for the whole repository (the standalone queue supports Node 20+). From the repository root:
 
----
-
-## Architecture Overview
-
-```
-CISA/MITRE Feeds → Job Queue → Cursor Subagents → Validated Detections → Dual PRs (DRAFT)
-                                      ↓
-                            Attack Range Testing
-                                      ↓
-                              Splunk Validation
-                                      ↓
-                             Attack Data Dump
+```sh
+npm ci
+npm run build
+npm ci --prefix agents
+npm run build --prefix agents
+npm ci --prefix automation
+npm test --prefix automation
+npm run test:agents --prefix automation
 ```
 
-### Cursor Subagents (9 Specialists)
+The last command uses the actual compiled agents CLI with synthetic input, a disposable database, and no live credentials. It must end with a `simulated` job and zero approval requests.
 
-Located in `.cursor/agents/`:
+## Explicit setup
 
-| Subagent | Purpose |
-|----------|---------|
-| `orchestrator.md` | Main workflow coordinator |
-| `cti-analyst.md` | Parse threat intel, extract TTPs |
-| `detection-engineer.md` | Write SPL, create YAMLs |
-| `coverage-analyzer.md` | Gap analysis |
-| `atomic-executor.md` | Find/run atomic tests (background) |
-| `splunk-validator.md` | Validate detections fire |
-| `data-dumper.md` | Export attack data |
-| `pr-stager.md` | Create dual draft PRs |
-| `verifier.md` | Skeptical validator |
+Use a new database in an existing private directory. Do not share the MCP cache: reindexing replaces that cache.
 
----
-
-## Quick Start
-
-### Prerequisites
-
-1. **Detections MCP v2.x** installed and built (see [Setup Guide](../SETUP.md))
-
-2. **Attack Range** configured and accessible (Splunk only):
-   - Python environment with `attack_range.py`
-   - AWS/local infrastructure deployed
-
-3. **Splunk MCP** connected to Attack Range Splunk instance (Splunk only)
-
-4. **Environment Variables**:
-   ```bash
-   export DETECTIONS_DB_PATH="$HOME/.cache/security-detections-mcp/detections.sqlite"
-   export ATTACK_RANGE_PATH="/path/to/attack_range"
-   export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-   export GITHUB_TOKEN="ghp_your_token_here"
-   ```
-
-### Installation
-
-1. **Apply database migrations**:
-   ```bash
-   sqlite3 $DETECTIONS_DB_PATH < automation/migrations/001_add_job_queue.sql
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   cd automation
-   npm install feedparser-promised better-sqlite3
-   ```
-
-3. **Verify subagents loaded**:
-   ```bash
-   ls -la .cursor/agents/
-   # Should show: orchestrator.md, cti-analyst.md, etc.
-   ```
-
-### Manual Testing
-
-Test individual subagents before running autonomous mode:
-
-```bash
-# In Cursor Chat:
-
-# 1. Test CTI analysis
-> /cti-analyst https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-131a
-
-# 2. Test detection creation for a technique
-> /detection-engineer Create detection for T1003.001 credential dumping
-
-# 3. Test full pipeline
-> /orchestrator "Process CISA alert about STORM-0501"
+```sh
+export AUTOMATION_DB_PATH=/absolute/private/path/automation.sqlite
+export AUTOMATION_MODE=dry-run
+npm run migrate --prefix automation
+npm run loop --prefix automation
 ```
 
-### Autonomous Mode
+`loop` processes at most one pending job; an empty queue is a no-op. `npm start --prefix automation` polls continuously. Ctrl+C/SIGTERM stops after the current invocation, whose default timeout is 30 minutes. The foreground launcher does not create PID files or background daemons.
 
-Run the autonomous loop to process feeds automatically:
+`AGENTS_CLI_PATH` optionally overrides the sibling `agents/dist/src/cli.js` path. All adapter input travels through a private temporary file and `execFile` arguments, never a shell command. Temporary input is deleted after the child exits.
 
-```bash
-# One-time feed collection
-node automation/collectors/cisa-rss-collector.ts once
+## Collection and scheduling
 
-# Continuous feed collection (background process)
-node automation/collectors/cisa-rss-collector.ts continuous &
+`npm run collect --prefix automation` explicitly fetches CISA advisories and KEV, regardless of worker mode. It writes feed records and one queued analysis per new source-qualified feed ID. Collection failures exit nonzero; successfully ingested items remain, and retries deduplicate them. Network requests have a 30-second timeout and 8 MiB response limit.
 
-# Start autonomous job processor
-node automation/runners/autonomous-loop.ts
+Schedules are opt-in and stored in SQLite, with UTC expressions:
+
+```sh
+npm run scheduler --prefix automation -- add cisa-hourly '0 * * * *'
+npm run scheduler --prefix automation -- status
+npm run scheduler --prefix automation -- start
 ```
 
-Or use the provided wrapper script:
+The scheduler only queues `feed_collection`. A worker executes those scheduled collections only with `AUTOMATION_MODE=live`; disabled/dry-run workers block those jobs. Unsupported schedule types fail explicitly. Feed definitions live in `collectors/multi-source-collector.ts`; `config/autonomous.yml` is an annotated reference, not loaded configuration.
 
-```bash
-./automation/scripts/start-autonomous.sh
+## Results and human review
+
+| Job state | Meaning |
+| --- | --- |
+| `pending` / `running` | Queued / claimed by one worker |
+| `simulated` | Synthetic dry-run output; no validation or coverage claim |
+| `awaiting_approval` | Live result passed adapter checks and has persistent artifacts |
+| `reviewed` | A local reviewer accepted the stored result; nothing was published |
+| `cancelled` | Review rejected or expired |
+| `blocked` | Configuration, unsupported operation, or incomplete evidence needs intervention |
+| `failed` | Transient failures exhausted the configured attempts |
+| `completed` | Successful feed collection only, never threat analysis |
+
+```sh
+npm run approvals --prefix automation -- list
+npm run approvals --prefix automation -- approve approval_ID
+npm run approvals --prefix automation -- reject approval_ID 'reason'
+npm run approvals --prefix automation -- check-expired
+npm run report --prefix automation -- weekly /absolute/path/report.md
 ```
 
----
+Approval records the local OS username; it is a local operator tool, not an authenticated multi-user service. It never replays the pipeline. Navigator reports include only reviewed live detections and make no deployment or measured-coverage claims.
 
-## Configuration
-
-Edit `automation/config/autonomous.yml`:
-
-```yaml
-feeds:
-  cisa_alerts:
-    enabled: true
-    poll_interval: 3600  # 1 hour
-
-agent:
-  model: "claude-sonnet-4-20250514"
-  human_approval_required:
-    - pr_creation  # Require approval before staging PRs
-
-outputs:
-  slack:
-    enabled: true
-    channel: "#detection-engineering"
-```
-
----
-
-## Workflow Details
-
-### Complete Threat-to-Detection Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Feed Item Ingested (CISA alert, MITRE update, etc.)         │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. /cti-analyst: Extract TTPs, map to MITRE, identify priority │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. /coverage-analyzer: Check existing coverage, find gaps      │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                    ┌────────┴────────┐
-                    │ Gaps found?     │
-                    └────────┬────────┘
-                             │ YES
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. /detection-engineer: Create detection YAML                  │
-│    • Check data source availability (Attack Range constraint)  │
-│    • Match repo style patterns                                 │
-│    • Generate SPL query                                        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 5. /qa-reviewer: Validate schema, naming, MITRE mapping        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                    ┌────────┴────────┐
-                    │ contentctl pass?│
-                    └────────┬────────┘
-                             │ YES
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. /atomic-executor (background): Find & execute atomic test   │
-│    • Query ART MCP for matching test                           │
-│    • Execute via Attack Range: python attack_range.py simulate │
-│    • Wait for completion                                       │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼ (wait 2 min for ingestion)
-┌─────────────────────────────────────────────────────────────────┐
-│ 7. /splunk-validator: Run detection via Splunk MCP             │
-│    • Execute SPL query against ingested data                   │
-│    • Verify results match expected fields                      │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                    ┌────────┴────────┐
-                    │ Detection fires?│
-                    └────────┬────────┘
-                             │ YES
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 8. /data-dumper: Export attack data from Splunk                │
-│    • Dump Sysmon, Security logs from test window               │
-│    • Create attack_data YAML metadata                          │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 9. /fp-analyst: Assess false positive risk                     │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼ (if FP risk acceptable)
-┌─────────────────────────────────────────────────────────────────┐
-│ 10. /pr-stager: Create dual DRAFT PRs                          │
-│     • security_content: detection YAML                         │
-│     • attack_data: dataset YAML + logs                         │
-│     • Cross-reference PRs                                      │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 11. /verifier: Skeptically verify everything worked            │
-│     • Files exist?                                             │
-│     • contentctl validates?                                    │
-│     • PRs are DRAFT?                                           │
-│     • PRs reference each other?                                │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-                    ┌────────────────┐
-                    │ VERIFIED ✓     │
-                    │ Notify humans  │
-                    └────────────────┘
-```
-
-### If Validation Fails
-
-The system automatically:
-1. **Analyzes** failure root cause
-2. **Suggests** SPL fixes to /detection-engineer
-3. **Retries** up to 3 times
-4. **Logs** failure patterns for future improvement
-5. **Notifies** humans if max retries exceeded
-
----
-
-## Human-in-the-Loop
-
-Approval required for:
-- **PR Creation** - Review before staging PRs
-- **High Impact Detections** - Critical infrastructure detections
-- **New Data Sources** - Detections requiring sources not in Attack Range
-- **High FP Risk** - Detections likely to have many false positives
-
-### Approve/Reject via CLI
-
-```bash
-# List pending approvals
-node automation/hitl/approval-system.ts list
-
-# Approve
-node automation/hitl/approval-system.ts approve approval_xyz123
-
-# Reject
-node automation/hitl/approval-system.ts reject approval_xyz123 "Needs more tuning"
-```
-
----
-
-## Database Schema
-
-Added to detections MCP SQLite:
-
-### Jobs Table
-```sql
-CREATE TABLE jobs (
-  id TEXT PRIMARY KEY,
-  job_type TEXT NOT NULL,
-  status TEXT DEFAULT 'pending',
-  priority INTEGER DEFAULT 5,
-  payload TEXT,  -- JSON
-  result TEXT,   -- JSON
-  ...
-);
-```
-
-### Feed Items Table
-```sql
-CREATE TABLE feed_items (
-  id TEXT PRIMARY KEY,
-  feed_source TEXT NOT NULL,
-  title TEXT NOT NULL,
-  content TEXT,
-  url TEXT,
-  status TEXT DEFAULT 'pending',
-  job_id TEXT,
-  ...
-);
-```
-
-### Campaign Observations Table
-```sql
-CREATE TABLE campaign_observations (
-  id TEXT PRIMARY KEY,
-  campaign_id TEXT NOT NULL,
-  observed_at TEXT NOT NULL,
-  observation_type TEXT NOT NULL,
-  content TEXT NOT NULL,
-  ...
-);
-```
-
-See `automation/migrations/001_add_job_queue.sql` for full schema.
-
----
-
-## Monitoring
-
-### View Queue Status
-
-```bash
-sqlite3 $DETECTIONS_DB_PATH "
-  SELECT status, COUNT(*) 
-  FROM jobs 
-  GROUP BY status;
-"
-```
-
-### View Recent Detections
-
-```bash
-sqlite3 $DETECTIONS_DB_PATH "
-  SELECT id, job_type, status, created_at 
-  FROM jobs 
-  WHERE job_type = 'detection_creation' 
-  ORDER BY created_at DESC 
-  LIMIT 10;
-"
-```
-
-### View Feed Health
-
-```bash
-sqlite3 $DETECTIONS_DB_PATH "
-  SELECT feed_source, status, COUNT(*) 
-  FROM feed_items 
-  WHERE ingested_at > datetime('now', '-24 hours')
-  GROUP BY feed_source, status;
-"
-```
-
----
-
-## Self-Improvement Features
-
-### Reflection Layers
-
-The system reflects on its performance at three levels:
-
-1. **Micro** (per-detection): "Did this validation pass? Why?"
-2. **Meso** (per-technique-category): "What patterns work for T1003.* detections?"
-3. **Macro** (weekly): "What should we improve about the pipeline?"
-
-All reflections stored in the MCP knowledge graph via:
-- `log_decision` - Record WHY choices were made
-- `add_learning` - Capture reusable patterns
-
-### Pattern Learning
-
-After 10 successful T1003.001 detections, the system learns:
-- Common SPL patterns for credential dumping
-- Best data sources (Sysmon EventID 1 vs 10)
-- Effective false positive filters
-- Reliable atomic tests
-
-Future T1003.* detections automatically use these patterns.
-
----
-
-## Deployment Modes
-
-### Mode 1: Development (Manual Invocation)
-
-Test subagents manually in Cursor:
-
-```
-> /cti-analyst <URL>
-> /orchestrator "Create detection for T1003.001"
-```
-
-### Mode 2: Semi-Autonomous (Cron Jobs)
-
-Run collectors periodically, process queue manually:
-
-```bash
-# Crontab:
-0 */1 * * * node /path/to/automation/collectors/cisa-rss-collector.ts once
-```
-
-Then manually run autonomous loop when ready:
-
-```bash
-node automation/runners/autonomous-loop.ts
-```
-
-### Mode 3: Full Autonomous (Production)
-
-Both collectors and processor run continuously:
-
-```bash
-# Terminal 1: Feed collection
-node automation/collectors/cisa-rss-collector.ts continuous
-
-# Terminal 2: Job processing
-node automation/runners/autonomous-loop.ts
-
-# Terminal 3: Approval monitor (cron or continuous)
-watch -n 300 'node automation/hitl/approval-system.ts check-expired'
-```
-
-Use `systemd`, `pm2`, or Docker Compose for production deployment.
-
----
-
-## Attack Range Integration
-
-### Data Source Constraints
-
-Detections are constrained to Attack Range-available sources:
-
-| Platform | Sources |
-|----------|---------|
-| Windows | Sysmon, Windows Security 4688, PowerShell |
-| Linux | Sysmon for Linux |
-| Network | Zeek |
-| EDR (optional) | CrowdStrike FDR |
-
-If a technique requires unavailable data sources, the system:
-1. Flags it during detection creation
-2. Requests human approval
-3. Suggests alternative approaches
-
-### Validation Flow
-
-```
-Detection YAML → Find Atomic Test → Execute in Attack Range
-                                           ↓
-                                    Wait 2 minutes
-                                           ↓
-                        Run detection via Splunk MCP
-                                           ↓
-                   ┌────────────────────────┴────────────────────────┐
-                   │                                                 │
-                   ▼ (results > 0)                                   ▼ (no results)
-              VALIDATED ✓                                       DEBUG & REFINE
-                   │                                                 │
-                   ▼                                                 │
-            Dump attack data                                         │
-                   │                                                 │
-                   └─────────────────────────────────────────────────┘
-                                      ↓
-                              Stage dual PRs
-```
-
----
-
-## Notification Templates
-
-Slack messages sent for:
-- ✅ **Detection Validated** - With PR links
-- ❌ **Validation Failed** - With debug info
-- 🔍 **Coverage Gap** - Identified missing techniques
-- 📦 **PRs Staged** - Batch of detections ready for review
-
-Configure in `automation/config/autonomous.yml`:
-
-```yaml
-outputs:
-  slack:
-    webhook_url: "${SLACK_WEBHOOK_URL}"
-    channel: "#detection-engineering"
-    enabled: true
-```
-
----
-
-## Self-Improvement Example
-
-After successfully validating 5 T1003.001 detections:
-
-**System learns**:
-```
-Pattern: T1003.001 LSASS Credential Dumping
-- Use Endpoint.Processes data model
-- Filter on: process_name IN (procdump.exe, Taskmgr.exe)
-- Filter on: process contains "lsass"
-- Exclude: Windows Defender, backup software
-- Atomic test: T1003.001-1 reliably triggers
-- Validation rate: 95%
-```
-
-**Next T1003.001 detection**:
-- System queries learned patterns via `get_similar_detection_patterns`
-- Applies proven SPL fragments
-- Validation passes on first attempt
-- Quality measurably improves
-
----
-
-## File Structure
-
-```
-automation/
-├── README.md                      # This file
-├── config/
-│   └── autonomous.yml             # Configuration
-├── migrations/
-│   └── 001_add_job_queue.sql      # Database schema
-├── collectors/
-│   ├── cisa-rss-collector.ts      # CISA feed collector
-│   └── multi-source-collector.ts  # All other sources
-├── runners/
-│   └── autonomous-loop.ts         # Job queue processor
-├── notifications/
-│   └── slack-notifier.ts          # Slack integration
-├── hitl/
-│   └── approval-system.ts         # Human approval system
-├── learning/
-│   └── reflection-prompts.md      # Reflection guides
-└── scripts/
-    ├── start-autonomous.sh        # Start all services
-    └── stop-autonomous.sh         # Stop gracefully
-
-.cursor/agents/
-├── orchestrator.md                # Main coordinator
-├── cti-analyst.md                 # Threat intel parsing
-├── detection-engineer.md          # SPL/YAML creation
-├── coverage-analyzer.md           # Gap analysis
-├── atomic-executor.md             # Atomic test execution
-├── splunk-validator.md            # Detection validation
-├── data-dumper.md                 # Attack data export
-├── pr-stager.md                   # GitHub PR staging
-├── fp-analyst.md                  # False positive analysis
-├── qa-reviewer.md                 # Quality assurance
-└── verifier.md                    # Skeptical validator
-```
-
----
-
-## Success Metrics
-
-Track these in the database:
-
-| Metric | Target | Query |
-|--------|--------|-------|
-| Detection validation rate | >90% | `SELECT AVG(CASE WHEN status='passed' THEN 1.0 ELSE 0 END) FROM validation_results` |
-| Schema compliance | 100% | `SELECT COUNT(*) FROM jobs WHERE job_type='detection_creation' AND error LIKE '%contentctl%'` |
-| Time to detection | <4 hours | `SELECT AVG(julianday(completed_at) - julianday(created_at)) * 24 FROM jobs WHERE job_type='threat_analysis'` |
-| Coverage improvement | Track over time | `SELECT assessed_at, coverage_percentage FROM campaign_coverage ORDER BY assessed_at` |
-
----
-
-## Troubleshooting
-
-### Subagent not found
-
-**Problem**: `Error: Subagent 'orchestrator' not found`
-
-**Solution**: Ensure `.cursor/agents/orchestrator.md` exists and has proper YAML frontmatter.
-
-### Validation always fails
-
-**Problem**: Detections fire 0 results in Splunk
-
-**Causes**:
-1. Logs not ingested (wait longer)
-2. Wrong sourcetype/index
-3. SPL logic error
-4. Atomic test didn't execute
-
-**Debug**:
-```bash
-# Check if atomic ran
-python attack_range.py show
-
-# Check Splunk indices
-# Via Splunk MCP: list_indices()
-
-# Check recent logs
-# Via Splunk MCP: search("index=win | head 10")
-```
-
-### Job queue stuck
-
-**Problem**: Jobs remain in 'pending' status
-
-**Solution**: Check autonomous loop is running:
-```bash
-ps aux | grep autonomous-loop
-```
-
-Restart if needed:
-```bash
-pkill -f autonomous-loop
-node automation/runners/autonomous-loop.ts &
-```
-
----
-
-## What Makes This "Face-Melting"
-
-| Basic Automation | This System |
-|-----------------|-------------|
-| Creates YAML | Creates, validates, tests, dumps data, stages PRs |
-| One agent | 9 specialized Cursor Subagents |
-| Hope it works | **Proves it works** via atomic testing |
-| Manual testing | Automated atomic → Splunk validation |
-| Point-in-time | Temporal campaign memory |
-| Static pipeline | Self-improving via reflection |
-
-This is a **Detection Engineering Team in a Box** that learns and improves over time.
-
----
-
-## Next Steps
-
-1. **Phase 1**: Test subagents manually via Cursor chat
-2. **Phase 2**: Run collectors once, verify feed items ingested
-3. **Phase 3**: Process one feed item manually via /orchestrator
-4. **Phase 4**: Enable autonomous loop for continuous operation
-5. **Phase 5**: Monitor learning effectiveness after 50+ detections
-6. **Phase 6**: Add additional feeds, tune configuration
-
----
-
-## Contributing
-
-All subagents are markdown files in `.cursor/agents/`. To improve a subagent:
-
-1. Edit the `.md` file
-2. Test changes manually
-3. Commit improved version
-4. System automatically uses updated prompts
-
-Pattern improvements logged to knowledge graph are automatically applied by the detection-engineer subagent.
-
----
-
-## Support & References
-
-- **Cursor Subagents**: https://cursor.com/docs/context/subagents
-- **Attack Range**: https://github.com/splunk/attack_range
-- **Attack Data**: https://github.com/splunk/attack_data
-- **Atomic Red Team**: https://github.com/redcanaryco/atomic-red-team
-- **Security Content**: https://github.com/splunk/security_content
+See [deployment and recovery](DEPLOYMENT.md), [behavior and architecture](ARCHITECTURE.md), and [tests](TESTING-GUIDE.md) before considering live mode.
