@@ -1,0 +1,26 @@
+name: Hosted database security
+on:
+  pull_request:
+    paths:
+      - 'web/supabase/migrations/**'
+      - 'web/tests/security/**'
+      - '.github/workflows/hosted-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/supabase/migrations/**'
+      - 'web/tests/security/**'
+      - '.github/workflows/hosted-security.yml'
+permissions:
+  contents: read
+jobs:
+  database-security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-16
+      - name: Role, quota and concurrency regression tests
+        env:
+          PG_BIN: /usr/lib/postgresql/16/bin
+        run: python3 web/tests/security/test_database.py
