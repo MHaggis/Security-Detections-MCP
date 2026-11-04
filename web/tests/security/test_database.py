@@ -23,6 +23,7 @@ class SecurityTests(unittest.TestCase):
         cls.env = {**os.environ, 'PGHOST': str(cls.path), 'PGPORT': '54385', 'PGUSER': 'postgres', 'PGDATABASE': 'postgres'}
         subprocess.run([str(PG/'initdb'), '-D', str(cls.path/'db'), '-U', 'postgres', '-A', 'trust'], check=True, stdout=subprocess.DEVNULL)
         subprocess.run([str(PG/'pg_ctl'), '-D', str(cls.path/'db'), '-l', str(cls.path/'server.log'), '-o', f"-k {cls.path} -p 54385 -c listen_addresses=''", '-w', 'start'], check=True, stdout=subprocess.DEVNULL)
+        cls.addClassCleanup(cls.cleanup_cluster)
         cls.sql("""CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
           CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY, email text, raw_user_meta_data jsonb DEFAULT '{}');
           CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
@@ -31,16 +32,61 @@ class SecurityTests(unittest.TestCase):
           ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRUNCATE ON TABLES TO PUBLIC;
         """)
         migrations = ROOT/'web/supabase/migrations'
-        for name in ['001_schema.sql','002_rls_and_functions.sql','012_security_hardening.sql','013_atomic_rate_limit.sql','014_mcp_tokens.sql']:
+        for name in ['001_schema.sql','002_rls_and_functions.sql','012_security_hardening.sql','013_atomic_rate_limit.sql','014_mcp_tokens.sql',
+                     '015_sync_runs_backfill.sql','016_add_jamf_protect_source.sql',
+                     '20261104164055_source_qualified_detection_identity.sql']:
             cls.sql((migrations/name).read_text())
         cls.sql('GRANT UPDATE (calls_today) ON public.mcp_tokens TO PUBLIC; GRANT UPDATE (tier) ON public.profiles TO authenticated;')
         migration = migrations/'20261104164335_hosted_token_security.sql'
         cls.sql(migration.read_text())
         cls.sql(migration.read_text()) # repeat safely preserves policies/grants
+        cls.sql("""
+          INSERT INTO public.attack_techniques(technique_id,name) VALUES('T1059','Command interpreter');
+          INSERT INTO public.attack_actors(actor_id,name) VALUES('G0001','Test Actor');
+          INSERT INTO public.actor_techniques(actor_id,technique_id) VALUES('G0001','T1059');
+          INSERT INTO public.detections(id,name,source_type,mitre_ids,severity,mitre_tactics)
+            VALUES('collision','PowerShell test','sigma','["T1059"]','high','["execution"]'),
+                  ('collision','PowerShell test','elastic','["T1059"]','medium','["execution"]');
+          INSERT INTO public.technique_tactics(technique_id,tactic_name) VALUES('T1059','execution');
+        """)
+        cls.function_before = cls.function_state()
+        cls.catalog_before = cls.catalog_results()
+        search_path_migration = (migrations/'20261104171820_function_search_path.sql').read_text()
+        cls.sql(search_path_migration)
+        cls.sql(search_path_migration)
         cls.sql(f"INSERT INTO auth.users(id,email) VALUES ('{USER}','one@example.invalid'),('{OTHER}','two@example.invalid');")
 
     @classmethod
-    def tearDownClass(cls):
+    def function_state(cls):
+        return json.loads(cls.sql("""SELECT jsonb_object_agg(p.oid::text, to_jsonb(p))
+          FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public';"""))
+
+    @classmethod
+    def catalog_results(cls, role='anon', shadow=False):
+        calls = ["get_coverage_summary()", "search_detections_full('PowerShell',15)",
+          "get_technique_intelligence('T1059')", "get_threat_profile_gaps('apt')",
+          "compare_actors(ARRAY['Test Actor'])", "search_detections_by_filter('severity','high',15)",
+          "get_tactic_counts()", "get_source_counts()", "get_covered_technique_count()",
+          "get_actor_technique_counts()", "search_actors('Test')", "get_actor_coverage('G0001')",
+          "get_dashboard_stats()", "get_actor_profile_full('Test Actor')", "get_technique_full('T1059',200)",
+          "get_technique_source_counts('T1059')", "get_actor_intelligence('Test Actor')",
+          "compare_sources_for_technique('T1059')", "get_procedure_coverage('T1059')"]
+        setup = f'SET ROLE {role}; '
+        if shadow:
+            # Empty fake tables would change each result if caller search_path
+            # or the implicitly preferred temporary schema were still used.
+            setup += """CREATE TEMP TABLE detections (LIKE public.detections);
+              CREATE TEMP TABLE detection_techniques (LIKE public.detection_techniques);
+              CREATE TEMP TABLE attack_actors (LIKE public.attack_actors);
+              CREATE TEMP TABLE actor_techniques (LIKE public.actor_techniques);
+              CREATE TEMP TABLE attack_techniques (LIKE public.attack_techniques);
+              CREATE TEMP TABLE technique_tactics (LIKE public.technique_tactics);
+              SET search_path = pg_temp, public, pg_catalog; """
+        output = cls.sql(setup + '\n'.join(f"SELECT coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) FROM public.{call} t;" for call in calls))
+        return [json.loads(line) for line in output.splitlines()]
+
+    @classmethod
+    def cleanup_cluster(cls):
         subprocess.run([str(PG/'pg_ctl'), '-D', str(cls.path/'db'), '-m','immediate','-w','stop'], check=True, stdout=subprocess.DEVNULL)
         cls.tmp.cleanup()
 
@@ -61,6 +107,40 @@ class SecurityTests(unittest.TestCase):
 
     def call(self, token='hash-one'):
         return json.loads(self.sql(f"SET ROLE service_role; SELECT public.increment_mcp_call('{token}');"))
+
+    def test_search_path_changes_only_twenty_function_configs(self):
+        after = self.function_state()
+        self.assertEqual(set(after), set(self.function_before))
+        changed = []
+        for oid, previous in self.function_before.items():
+            current = after[oid]
+            if previous['proconfig'] != current['proconfig']:
+                changed.append(current['proname'])
+                self.assertEqual(current['proconfig'], ['search_path=pg_catalog, public, pg_temp'])
+            self.assertEqual({k:v for k,v in previous.items() if k != 'proconfig'},
+                             {k:v for k,v in current.items() if k != 'proconfig'})
+        self.assertEqual(len(changed),20)
+        self.assertIn('handle_new_user',changed)
+        self.assertNotIn('increment_mcp_call',changed)
+        self.assertNotIn('reconcile_detection_techniques',changed)
+
+    def test_all_catalog_rpcs_preserve_results_with_hostile_search_path(self):
+        self.assertEqual(len(self.catalog_before),19)
+        for role in ['anon','authenticated','service_role']:
+            with self.subTest(role=role):
+                self.assertEqual(self.catalog_results(role,shadow=True), self.catalog_before)
+
+    def test_signup_trigger_uses_public_profiles(self):
+        uid='00000000-0000-4000-8000-000000000003'
+        result=self.sql(f"""BEGIN;
+          CREATE TEMP TABLE profiles (LIKE public.profiles);
+          SET search_path=pg_temp,public,pg_catalog;
+          INSERT INTO auth.users(id,email,raw_user_meta_data)
+            VALUES('{uid}','new@example.invalid','{{"full_name":"Signup Name"}}');
+          SELECT display_name || ':' || tier || ':' || role FROM public.profiles WHERE id='{uid}';
+          SELECT count(*) FROM pg_temp.profiles;
+          ROLLBACK;""")
+        self.assertEqual(result.splitlines(),['Signup Name:free:user','0'])
 
     def test_owner_reads_but_cannot_mutate_token_accounting(self):
         self.assertEqual(self.sql(self.as_user('SELECT count(*) FROM public.mcp_tokens;')), '1')
