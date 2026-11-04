@@ -107,4 +107,5 @@ jobs:
         env:
           SYNC_SOURCE_TYPE: nightly_full
           CATALOG_SEED_TRANSPORT: postgres
+          NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/web/certs/supabase-prod-ca-2021.crt
           SUPABASE_CATALOG_DATABASE_URL: ${{ secrets.SUPABASE_CATALOG_DATABASE_URL }}

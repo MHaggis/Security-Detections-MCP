@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
+import { X509Certificate } from 'node:crypto';
 import pg from 'pg';
 import Database from 'better-sqlite3';
 import { catalogConnectionConfig, safeDatabaseError } from '../scripts/catalog-postgres.mjs';
@@ -27,6 +28,20 @@ async function seed(extra={}) {
   return promisify(execFile)(process.execPath,['--experimental-strip-types',script],{env,timeout:120000});
 }
 try {
+  const providerPem=readFileSync(new URL('../certs/supabase-prod-ca-2021.crt',import.meta.url),'utf8');
+  assert.doesNotMatch(providerPem,/PRIVATE KEY/);
+  assert.equal(providerPem.match(/-----BEGIN /g)?.length,1,'only one reviewed PEM block may extend trust');
+  assert.equal(providerPem.match(/-----BEGIN CERTIFICATE-----/g)?.length,1);
+  assert.equal(providerPem.match(/-----END /g)?.length,1);
+  const providerCa=new X509Certificate(providerPem);
+  assert.equal(providerCa.fingerprint256.replaceAll(':',''),'807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA');
+  assert.equal(providerCa.ca,true);
+  assert.equal(providerCa.verify(providerCa.publicKey),true);
+  assert.ok(Date.now()>=Date.parse(providerCa.validFrom)&&Date.now()<Date.parse(providerCa.validTo),'provider CA must be currently valid');
+  const workflow=readFileSync(new URL('../../.github/workflows/nightly-sync.yml',import.meta.url),'utf8');
+  const seedStep=workflow.split('- name: Seed Supabase from SQLite')[1]?.split('\n      - name:')[0];
+  assert.ok(seedStep?.split('\n').some(line=>line.trim()==='NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/web/certs/supabase-prod-ca-2021.crt'),'nightly seed must load the reviewed CA by absolute workspace path');
+  assert.equal(catalogConnectionConfig(connection).ssl.rejectUnauthorized,true);
   run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',join(temporary,'ca.key'),'-out',ca,'-days','1','-subj','/CN=Disposable Catalog Test CA']);
   run('openssl',['req','-newkey','rsa:2048','-nodes','-keyout',join(temporary,'server.key'),'-out',join(temporary,'server.csr'),'-subj','/CN=localhost']);
   writeFileSync(join(temporary,'extensions'),'subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\n');

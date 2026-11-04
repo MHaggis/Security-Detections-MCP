@@ -13,9 +13,9 @@ catalog. No WAF rules, addresses, request identity, or role timeouts are weakene
   is never selected as fallback. Nightly no longer receives a service-role key.
 - DIRECT-002: pg client verifies certificate trust and hostname with its trusted CA store.
   URL parsing rejects query options and admin/service usernames, then passes
-  discrete connection fields and rejectUnauthorized=true. Extra trusted roots,
-  if provider configuration requires them, use Node's explicit CA mechanism;
-  verification may not be disabled. Errors expose only safe error codes and the
+  discrete connection fields and rejectUnauthorized=true. This project adds the
+  reviewed public Supabase Root2021 CA through NODE_EXTRA_CA_CERTS before process
+  startup. Verification may not be disabled. Errors expose only safe error codes and the
   fixed statement-timeout message, never URL/password/driver details.
 - DIRECT-003: migration creates catalog_sync NOLOGIN/NOSUPERUSER/NOBYPASSRLS,
   NOCREATEDB/NOCREATEROLE/NOINHERIT with no memberships. Lead separately provisions
@@ -42,7 +42,8 @@ TLS and SCRAM login authentication. It exercises all nine writes, two-source
 identity/edges, blocked CQL fixture through actual seed twice, failed sync,
 spoofed JWT claims, sensitive column grants, quota/DDL/TRUNCATE/serverfile/role
 and temporary-trigger negatives, normal signup, certificate trust/hostname,
-wrong password, absent/invalid settings and timeout splitting. The existing
+wrong password, absent/invalid settings and timeout splitting. A guard verifies
+  the tracked provider CA fingerprint/validity and the exact nightly CA path. The existing
 HTTP suite retains explicit HTTP coverage. Both run in the catalog-postgres CI
 job; web lint/typecheck/tests remain required.
 

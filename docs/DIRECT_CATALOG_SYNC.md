@@ -3,8 +3,13 @@
 Nightly uses SUPABASE_CATALOG_DATABASE_URL with the dedicated catalog_sync role.
 For the session pooler, the username is catalog_sync.<project-reference>; the
 database is postgres. The pg client always verifies TLS certificate trust and
-hostname. Supply no sslmode or other URL query parameters. Never put this URL in
-logs, tracked files, workflow outputs, PR text or local evidence artifacts.
+hostname. This project requires the public Supabase Root2021 CA in
+`web/certs/supabase-prod-ca-2021.crt`. Nightly sets NODE_EXTRA_CA_CERTS to its
+absolute workspace path before Node starts; local execution must set that
+variable to the certificate's absolute path as well. See `web/certs/README.md`
+for provenance, fingerprint, expiry and rotation. Supply no sslmode or other URL
+query parameters. Never put this URL in logs, tracked files, workflow outputs,
+PR text or local evidence artifacts.
 
 Apply the reviewed direct_catalog_sync_role migration first. It creates a role
 that cannot log in. A trusted administrator then generates a high-entropy random
